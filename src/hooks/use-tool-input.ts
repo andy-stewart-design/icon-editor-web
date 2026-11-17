@@ -186,14 +186,16 @@ export function useToolInput(): ToolInput {
         tool.pointerCancel()
         bump()
       },
-      // Losing capture mid-press (for example, the element being moved in the DOM) ends the gesture.
+      // The browser can release capture slightly before the pointerup that ends the press, at the same position.
+      // That is the release, so commit here at this position; the later pointerup finds no gesture and does nothing.
+      // A real cancel still goes through onPointerCancel and discards the draft.
       // After a normal pointerup the gesture is already cleared, so this does nothing.
       onLostPointerCapture(e) {
         const g = gestureRef.current
         if (!tool || !g || e.pointerId !== g.id) return
         gestureRef.current = null
         clearGesture(g)
-        tool.pointerCancel()
+        tool.pointerUp(toolEvent(store, localOf(e), e, spaceRef.current))
         bump()
       },
     }
