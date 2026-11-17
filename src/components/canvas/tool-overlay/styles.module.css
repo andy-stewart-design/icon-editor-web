@@ -1,0 +1,27 @@
+.layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+/* Same paint as serialized output (fill none, currentColor stroke), slightly translucent while drafting. */
+.draft {
+  fill: none;
+  stroke: #111;
+  opacity: 0.6;
+}
+
+/* Constant screen size: radius and stroke are in CSS px because the markers sit outside the zoomed group. */
+.snapPoint {
+  fill: #fff;
+  stroke: #1e7be0;
+  stroke-width: 1.5px;
+}
+
+.snapLine {
+  stroke: #1e7be0;
+  stroke-width: 1px;
+}

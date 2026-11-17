@@ -1,8 +1,46 @@
-import { actualSizeViewport, createDefaultDoc, fitViewport, type SnapIncrement } from '../../core'
+import { useState } from 'react'
+import {
+  actualSizeViewport,
+  createDefaultDoc,
+  fitViewport,
+  type ActiveTool,
+  type EditorStore,
+  type SnapIncrement,
+} from '../../core'
 import { useEditor, useEditorStore } from '../../hooks/use-editor'
 import s from './styles.module.css'
 
 const SNAP_INCREMENTS: readonly SnapIncrement[] = [1, 0.5, 0.25]
+
+const DRAW_TOOLS: readonly { tool: ActiveTool; label: string; key: string }[] = [
+  { tool: 'line', label: 'Line', key: 'L' },
+  { tool: 'rect', label: 'Rect', key: 'R' },
+  { tool: 'ellipse', label: 'Ellipse', key: 'E' },
+]
+
+// The text is kept as typed, so a half-entered value such as "" or "1." is not overwritten. Each valid
+// number goes to the store, clamped to 0 or more. Blur shows the stored value again.
+function RadiusInput({ store }: { store: EditorStore }) {
+  const [text, setText] = useState(() => String(store.getState().ui.rectRadius))
+  return (
+    <label className={s.field}>
+      Corner radius
+      <input
+        type="number"
+        className={s.input}
+        min={0}
+        step={0.5}
+        value={text}
+        onChange={(e) => {
+          setText(e.target.value)
+          const n = Number.parseFloat(e.target.value)
+          if (Number.isFinite(n)) store.setUi({ rectRadius: Math.max(0, n) })
+        }}
+        onBlur={() => setText(String(store.getState().ui.rectRadius))}
+      />
+    </label>
+  )
+}
 
 export default function Toolbar() {
   const store = useEditorStore()
@@ -12,6 +50,7 @@ export default function Toolbar() {
   const snapEnabled = useEditor((e) => e.ui.snapEnabled)
   const snapIncrement = useEditor((e) => e.ui.snapIncrement)
   const zoom = useEditor((e) => e.ui.viewport.zoom)
+  const activeTool = useEditor((e) => e.ui.activeTool)
 
   const fit = () => {
     const { doc, ui } = store.getState()
@@ -51,6 +90,21 @@ export default function Toolbar() {
         >
           Subgrid
         </button>
+      </div>
+      <div className={s.group} role="group" aria-label="Drawing tool">
+        {DRAW_TOOLS.map(({ tool, label, key }) => (
+          <button
+            key={tool}
+            type="button"
+            className={s.button}
+            aria-pressed={activeTool === tool}
+            title={`${label} (${key})`}
+            onClick={() => store.setUi({ activeTool: tool })}
+          >
+            {label}
+          </button>
+        ))}
+        {activeTool === 'rect' && <RadiusInput store={store} />}
       </div>
       <div className={s.group}>
         <button

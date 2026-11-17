@@ -17,6 +17,7 @@ export type UiState = {
   snapEnabled: boolean
   snapIncrement: SnapIncrement
   activeTool: ActiveTool
+  rectRadius: number // corner radius for the Rectangle tool, in doc units; clamped when the rect is built
   saveStatus: SaveStatus // 'failing' while the last save attempt failed
   loadNotice: LoadResult['notice'] // set on boot when the stored document was replaced
 }
@@ -41,6 +42,7 @@ export const defaultUi: UiState = {
   snapEnabled: true,
   snapIncrement: 0.5,
   activeTool: 'select',
+  rectRadius: 0,
   saveStatus: 'ok',
   loadNotice: null,
 }

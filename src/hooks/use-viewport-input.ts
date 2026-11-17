@@ -42,9 +42,10 @@ export function useViewportInput(ref: RefObject<HTMLDivElement | null>): void {
       store.setUi({ viewport: { ...vp, panX: vp.panX + dx, panY: vp.panY + dy } })
     }
 
+    // A draw in progress (data-drawing, set by use-tool-input) keeps the crosshair. Space then moves the shape.
     const syncCursor = () => {
       if (drag) el.dataset.pan = 'drag'
-      else if (spaceHeld) el.dataset.pan = 'space'
+      else if (spaceHeld && !el.dataset.drawing) el.dataset.pan = 'space'
       else delete el.dataset.pan
     }
 
@@ -95,7 +96,9 @@ export function useViewportInput(ref: RefObject<HTMLDivElement | null>): void {
     el.addEventListener(
       'pointerdown',
       (e) => {
-        if (!(e.button === 1 || (e.button === 0 && spaceHeld))) return
+        // Space + press during a draw moves the shape instead of panning, so it never starts a pan.
+        const spacePan = e.button === 0 && spaceHeld && !el.dataset.drawing
+        if (!(e.button === 1 || spacePan)) return
         e.preventDefault() // stops middle-click autoscroll
         el.setPointerCapture(e.pointerId)
         drag = { id: e.pointerId, x: e.clientX, y: e.clientY }
@@ -107,6 +110,8 @@ export function useViewportInput(ref: RefObject<HTMLDivElement | null>): void {
       'pointermove',
       (e) => {
         local(e)
+        // Keeps the cursor current after a draw ends: the tool clears data-drawing on pointerup, which comes later.
+        syncCursor()
         if (!drag || e.pointerId !== drag.id) return
         panBy(e.clientX - drag.x, e.clientY - drag.y)
         drag.x = e.clientX
@@ -149,7 +154,7 @@ export function useViewportInput(ref: RefObject<HTMLDivElement | null>): void {
     window.addEventListener(
       'keyup',
       (e) => {
-        if (e.key !== ' ') return
+        if (e.code !== 'Space') return
         spaceHeld = false
         syncCursor()
       },

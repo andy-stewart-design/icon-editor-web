@@ -4,6 +4,8 @@
   min-width: 0;
   min-height: 0;
   background: #e6e6e6;
+  /* Set from the active drawing tool. The pan rules below are more specific, so pan wins while held. */
+  cursor: var(--tool-cursor, auto);
 }
 
 .canvas[data-pan='space'] {

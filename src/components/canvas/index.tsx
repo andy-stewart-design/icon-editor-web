@@ -1,16 +1,20 @@
-import { useLayoutEffect, useRef } from 'react'
+import { useLayoutEffect, useRef, type CSSProperties } from 'react'
 import { fitViewport } from '../../core'
 import { useEditor, useEditorStore } from '../../hooks/use-editor'
+import { useToolInput } from '../../hooks/use-tool-input'
 import { useViewportInput } from '../../hooks/use-viewport-input'
 import ContentLayer from './content-layer'
 import GridLayer from './grid-layer'
 import KeylineLayer from './keyline-layer'
+import ToolOverlay from './tool-overlay'
 import s from './styles.module.css'
 
 export default function Canvas() {
   const store = useEditorStore()
   const ref = useRef<HTMLDivElement>(null)
   useViewportInput(ref)
+  // Tool handlers coexist with the viewport handlers: viewport pan takes the pointer when it starts first.
+  const tools = useToolInput()
   // The first non-zero measurement always fits the artboard, so a measured canvas means a fitted view.
   // Layers stay unrendered until then, so the default viewport never paints.
   const ready = useEditor((st) => st.ui.canvasSize.width > 0 && st.ui.canvasSize.height > 0)
@@ -37,13 +41,19 @@ export default function Canvas() {
   }, [store])
 
   return (
-    <div ref={ref} className={s.canvas}>
+    <div
+      ref={ref}
+      className={s.canvas}
+      style={{ '--tool-cursor': tools.cursor } as CSSProperties}
+      {...tools.handlers}
+    >
       {ready && (
         <>
           <GridLayer />
           <KeylineLayer />
           <ContentLayer />
-          {/* selection and tool overlay: Steps 2.3 and 2.4 */}
+          <ToolOverlay primitives={tools.primitives} />
+          {/* selection overlay: Step 2.3 */}
           <svg className={s.overlay} aria-hidden="true" />
         </>
       )}
