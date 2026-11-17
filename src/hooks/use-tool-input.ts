@@ -4,6 +4,8 @@ import {
   createEllipseTool,
   createLineTool,
   createRectTool,
+  createSelectTool,
+  type SelectTool,
   screenToDoc,
   type ActiveTool,
   type EditorStore,
@@ -47,7 +49,7 @@ function clearGesture(g: Gesture | null): void {
   if (g) delete g.el.dataset.drawing
 }
 
-// Tools for the activeTool values that draw. Other values have no tool, so pointer input does nothing.
+// Tools for the activeTool values that have one. Other values have no tool, so pointer input does nothing.
 // The rect radius is captured here; the tool is recreated when it changes.
 function createTool(store: EditorStore, activeTool: ActiveTool, rectRadius: number): Tool | null {
   switch (activeTool) {
@@ -57,10 +59,14 @@ function createTool(store: EditorStore, activeTool: ActiveTool, rectRadius: numb
       return createRectTool({ host: store, radius: () => rectRadius })
     case 'ellipse':
       return createEllipseTool(store)
+    case 'select':
+      return createSelectTool(store)
     default:
       return null
   }
 }
+
+const isSelectTool = (tool: Tool): tool is SelectTool => 'hover' in tool
 
 // Builds the ToolEvent for one moment: the doc point under the canvas-local position, under the current viewport.
 function toolEvent(store: EditorStore, local: Pt, mods: Modifiers, space: boolean): ToolEvent {
@@ -151,6 +157,12 @@ export function useToolInput(): ToolInput {
       },
       onPointerMove(e) {
         const g = gestureRef.current
+        // Plain moves reach only the select tool, so its hover highlight follows the pointer.
+        if (tool && !g && isSelectTool(tool)) {
+          tool.hover(toolEvent(store, localOf(e), e, spaceRef.current))
+          bump()
+          return
+        }
         if (!tool || !g || e.pointerId !== g.id) return
         g.local = localOf(e)
         tool.pointerMove(toolEvent(store, g.local, e, spaceRef.current))

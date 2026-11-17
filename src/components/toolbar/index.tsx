@@ -13,6 +13,7 @@ import s from './styles.module.css'
 const SNAP_INCREMENTS: readonly SnapIncrement[] = [1, 0.5, 0.25]
 
 const DRAW_TOOLS: readonly { tool: ActiveTool; label: string; key: string }[] = [
+  { tool: 'select', label: 'Select', key: 'V' },
   { tool: 'line', label: 'Line', key: 'L' },
   { tool: 'rect', label: 'Rect', key: 'R' },
   { tool: 'ellipse', label: 'Ellipse', key: 'E' },

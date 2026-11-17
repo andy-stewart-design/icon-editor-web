@@ -14,6 +14,13 @@
   opacity: 0.6;
 }
 
+/* Translucent accent halo around the hovered shape, in the zoomed group (stroke width is set per render). */
+.hover {
+  fill: none;
+  stroke: #1e7be0;
+  stroke-opacity: 0.35;
+}
+
 /* Constant screen size: radius and stroke are in CSS px because the markers sit outside the zoomed group. */
 .snapPoint {
   fill: #fff;
@@ -22,6 +29,14 @@
 }
 
 .snapLine {
+  stroke: #1e7be0;
+  stroke-width: 1px;
+}
+
+/* Translucent accent fill with a 1px border; screen-space rect, so the border never scales with zoom. */
+.marquee {
+  fill: #1e7be0;
+  fill-opacity: 0.12;
   stroke: #1e7be0;
   stroke-width: 1px;
 }

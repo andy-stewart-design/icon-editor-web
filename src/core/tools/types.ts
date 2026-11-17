@@ -1,4 +1,5 @@
 import type { Command } from '../commands'
+import type { Rect } from '../geometry/bounds'
 import type { PathShape, Pt } from '../model'
 import type { SnapResult } from '../snap'
 
@@ -20,6 +21,8 @@ export type OverlayPrimitive =
   | { kind: 'draft'; shape: PathShape }
   | { kind: 'snapPoint'; p: Pt } // an anchor target was hit
   | { kind: 'snapLine'; axis: 'x' | 'y'; value: number } // a straight target (edge, center or guide) was hit
+  | { kind: 'hover'; shapeId: string } // Select tool: the shape under the pointer, when no gesture is active
+  | { kind: 'marquee'; rect: Rect } // Select tool: the marquee being dragged, in doc units
 
 // The store satisfies this structurally. Each tool commit is one dispatch, so it is one history entry.
 export type ToolHost = {

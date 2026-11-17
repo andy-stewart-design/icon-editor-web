@@ -6,6 +6,7 @@ import { useViewportInput } from '../../hooks/use-viewport-input'
 import ContentLayer from './content-layer'
 import GridLayer from './grid-layer'
 import KeylineLayer from './keyline-layer'
+import SelectionOverlay from './selection-overlay'
 import ToolOverlay from './tool-overlay'
 import s from './styles.module.css'
 
@@ -52,9 +53,8 @@ export default function Canvas() {
           <GridLayer />
           <KeylineLayer />
           <ContentLayer />
+          <SelectionOverlay />
           <ToolOverlay primitives={tools.primitives} />
-          {/* selection overlay: Step 2.3 */}
-          <svg className={s.overlay} aria-hidden="true" />
         </>
       )}
     </div>

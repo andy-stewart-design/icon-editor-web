@@ -3,6 +3,7 @@ import { useEditor } from '../../../hooks/use-editor'
 import s from './styles.module.css'
 
 const SNAP_RING_RADIUS = 4 // screen px
+const HOVER_EXTRA_PX = 4 // screen px added to the shape's stroke width so the hover halo reads around it
 
 // Draft markup matches the content layer: the document's stroke width, caps and joins apply unless the shape overrides them.
 function DraftPath({ shape, doc }: { shape: PathShape; doc: IconDoc }) {
@@ -12,6 +13,20 @@ function DraftPath({ shape, doc }: { shape: PathShape; doc: IconDoc }) {
       className={s.draft}
       d={d}
       strokeWidth={shape.style.strokeWidth ?? doc.strokeWidth}
+      strokeLinecap={shape.style.linecap ?? doc.linecap}
+      strokeLinejoin={shape.style.linejoin ?? doc.linejoin}
+    />
+  )
+}
+
+// Hover halo: the shape's own outline, drawn wider in document units so it extends a fixed few screen px beyond the stroke.
+function HoverPath({ shape, doc, zoom }: { shape: PathShape; doc: IconDoc; zoom: number }) {
+  const d = shapeAttributes(shape).find(([k]) => k === 'd')?.[1] ?? ''
+  return (
+    <path
+      className={s.hover}
+      d={d}
+      strokeWidth={(shape.style.strokeWidth ?? doc.strokeWidth) + HOVER_EXTRA_PX / zoom}
       strokeLinecap={shape.style.linecap ?? doc.linecap}
       strokeLinejoin={shape.style.linejoin ?? doc.linejoin}
     />
@@ -43,12 +58,36 @@ export default function ToolOverlay({ primitives }: { primitives: OverlayPrimiti
           const c = docToScreen(vp, p.p)
           return <circle key={i} className={s.snapPoint} cx={c.x} cy={c.y} r={SNAP_RING_RADIUS} />
         }
-        if (p.axis === 'x') {
-          const x = origin.x + p.value * vp.zoom
-          return <line key={i} className={s.snapLine} x1={x} y1={origin.y} x2={x} y2={far.y} />
+        if (p.kind === 'snapLine') {
+          if (p.axis === 'x') {
+            const x = origin.x + p.value * vp.zoom
+            return <line key={i} className={s.snapLine} x1={x} y1={origin.y} x2={x} y2={far.y} />
+          }
+          const y = origin.y + p.value * vp.zoom
+          return <line key={i} className={s.snapLine} x1={origin.x} y1={y} x2={far.x} y2={y} />
         }
-        const y = origin.y + p.value * vp.zoom
-        return <line key={i} className={s.snapLine} x1={origin.x} y1={y} x2={far.x} y2={y} />
+        if (p.kind === 'hover') {
+          const shape = doc.shapes.find((sh) => sh.id === p.shapeId)
+          if (!shape) return null
+          return (
+            <g key={i} transform={`translate(${origin.x} ${origin.y}) scale(${vp.zoom})`}>
+              <HoverPath shape={shape} doc={doc} zoom={vp.zoom} />
+            </g>
+          )
+        }
+        // Marquee corners are mapped to screen space so the border stays 1px at any zoom.
+        const a = docToScreen(vp, { x: p.rect.x, y: p.rect.y })
+        const b = docToScreen(vp, { x: p.rect.x + p.rect.w, y: p.rect.y + p.rect.h })
+        return (
+          <rect
+            key={i}
+            className={s.marquee}
+            x={Math.min(a.x, b.x)}
+            y={Math.min(a.y, b.y)}
+            width={Math.abs(b.x - a.x)}
+            height={Math.abs(b.y - a.y)}
+          />
+        )
       })}
     </svg>
   )
