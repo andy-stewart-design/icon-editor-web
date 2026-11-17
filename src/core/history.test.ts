@@ -133,3 +133,27 @@ describe('editor store history', () => {
     expect(store.canRedo()).toBe(true)
   })
 })
+
+describe('replaceDocument', () => {
+  it('clears undo, redo, selection and any open transaction, and notifies committed listeners', () => {
+    const store = createEditorStore(baseDoc())
+    store.updateDoc('add', addShape('s2'))
+    store.undo()
+    store.setSelection({ shapeIds: ['s1'], nodes: [] })
+    store.begin('drag')
+    store.update(addShape('s3'))
+    const seen: IconDoc[] = []
+    store.subscribeCommitted((doc) => seen.push(doc))
+
+    const next: IconDoc = { ...baseDoc(), id: 'doc2', shapes: [] }
+    store.replaceDocument(next)
+
+    const state = store.getState()
+    expect(state.doc).toBe(next)
+    expect(state.tx).toBeNull()
+    expect(state.selection).toEqual(emptySel)
+    expect(store.canUndo()).toBe(false)
+    expect(store.canRedo()).toBe(false)
+    expect(seen).toEqual([next])
+  })
+})

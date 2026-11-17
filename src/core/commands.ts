@@ -1,5 +1,14 @@
 import { produce } from 'immer'
-import { pruneSelection, recordEntry, stepBack, stepForward, type HistoryEntry, type Selection } from './history'
+import {
+  emptyHistory,
+  emptySelection,
+  pruneSelection,
+  recordEntry,
+  stepBack,
+  stepForward,
+  type HistoryEntry,
+  type Selection,
+} from './history'
 import type { IconDoc } from './model'
 import type { EditorState } from './store'
 
@@ -70,6 +79,12 @@ export function createCommands(api: StateApi, notify: (doc: IconDoc) => void) {
     })
   }
 
+  // Swaps the whole document (New document). Drops any open transaction, history and selection.
+  const replaceDocument = (doc: IconDoc): void => {
+    api.setState({ doc, tx: null, history: emptyHistory, selection: emptySelection })
+    notify(doc)
+  }
+
   const undo = (): void => {
     cancel()
     const step = stepBack(api.getState().history)
@@ -99,6 +114,7 @@ export function createCommands(api: StateApi, notify: (doc: IconDoc) => void) {
   return {
     dispatch,
     updateDoc: (label: string, recipe: Recipe) => dispatch({ label, recipe }),
+    replaceDocument,
     begin,
     update,
     commit,

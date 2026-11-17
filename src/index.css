@@ -43,7 +43,7 @@
 }
 
 /* 6. Improve media defaults */
-:where(img, picture, video, canvas, svg) {
+:where(img, picture, video, canvas) {
     display: block;
     max-width: 100%;
 }

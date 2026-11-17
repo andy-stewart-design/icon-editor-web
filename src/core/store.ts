@@ -2,6 +2,7 @@ import { createStore } from 'zustand/vanilla'
 import { createCommands, type Command, type Recipe } from './commands'
 import { emptyHistory, emptySelection, type HistoryState, type Selection } from './history'
 import type { IconDoc } from './model'
+import type { LoadResult, SaveStatus } from './persistence'
 import type { Size, Viewport } from './viewport'
 
 export type ActiveTool = 'select' | 'node' | 'pen' | 'line' | 'rect' | 'ellipse'
@@ -16,6 +17,8 @@ export type UiState = {
   snapEnabled: boolean
   snapIncrement: SnapIncrement
   activeTool: ActiveTool
+  saveStatus: SaveStatus // 'failing' while the last save attempt failed
+  loadNotice: LoadResult['notice'] // set on boot when the stored document was replaced
 }
 
 // An open gesture: `base` is the doc at begin(), and every update() recomputes from it.
@@ -38,6 +41,8 @@ export const defaultUi: UiState = {
   snapEnabled: true,
   snapIncrement: 0.5,
   activeTool: 'select',
+  saveStatus: 'ok',
+  loadNotice: null,
 }
 
 export type Listener = (doc: IconDoc) => void
@@ -50,6 +55,7 @@ export type EditorStore = {
   setUi: (patch: Partial<UiState>) => void
   dispatch: (command: Command) => void
   updateDoc: (label: string, recipe: Recipe) => void
+  replaceDocument: (doc: IconDoc) => void
   begin: (label: string) => void
   update: (recipe: Recipe) => void
   commit: (selectionAfter?: Selection) => void
