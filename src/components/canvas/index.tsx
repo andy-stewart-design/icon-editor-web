@@ -4,6 +4,7 @@ import { useEditor, useEditorStore } from '../../hooks/use-editor'
 import { useViewportInput } from '../../hooks/use-viewport-input'
 import ContentLayer from './content-layer'
 import GridLayer from './grid-layer'
+import KeylineLayer from './keyline-layer'
 import s from './styles.module.css'
 
 export default function Canvas() {
@@ -40,7 +41,7 @@ export default function Canvas() {
       {ready && (
         <>
           <GridLayer />
-          {/* keylines layer: Step 2.2 */}
+          <KeylineLayer />
           <ContentLayer />
           {/* selection and tool overlay: Steps 2.3 and 2.4 */}
           <svg className={s.overlay} aria-hidden="true" />

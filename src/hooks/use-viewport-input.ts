@@ -1,5 +1,6 @@
 import { useEffect, type RefObject } from 'react'
 import { actualSizeViewport, fitViewport, zoomAt, type Pt, type Viewport } from '../core'
+import { isEditable } from './editable'
 import { useEditorStore } from './use-editor'
 
 // Safari reports pinch as non-standard gesture events that carry a cumulative scale.
@@ -7,10 +8,6 @@ type GestureEvent = Event & { scale: number }
 
 const LINE_PX = 16 // wheel deltas in lines are scaled to CSS px
 const ZOOM_RATE = 0.01 // per px of ctrl/meta+wheel delta; the trackpad pinch delta is small
-const EDITABLE_TAGS = new Set(['INPUT', 'TEXTAREA', 'SELECT'])
-
-const isEditable = (target: EventTarget | null): boolean =>
-  target instanceof HTMLElement && (target.isContentEditable || EDITABLE_TAGS.has(target.tagName))
 
 // Deltas are in CSS px. deltaMode 1 is lines and 2 is pages; a page is taken as the canvas height.
 function wheelPx(e: WheelEvent, pageHeight: number): Pt {
