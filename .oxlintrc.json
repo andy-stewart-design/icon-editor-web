@@ -4,5 +4,66 @@
   "rules": {
     "react/rules-of-hooks": "error",
     "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
+  },
+  "overrides": [
+    {
+      "files": ["src/core/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "react",
+                "message": "src/core must not import React; keep core pure and UI-free."
+              },
+              {
+                "name": "react-dom",
+                "message": "src/core must not import React DOM; keep core pure and UI-free."
+              }
+            ],
+            "patterns": [
+              {
+                "group": ["react/*", "react-dom/*"],
+                "message": "src/core must not import React packages; keep core pure and UI-free."
+              },
+              {
+                "group": [
+                  "**/components",
+                  "**/components/**",
+                  "../components",
+                  "../components/**",
+                  "../../components",
+                  "../../components/**"
+                ],
+                "message": "src/core must not import src/components; the dependency direction is components -> core."
+              },
+              {
+                "group": [
+                  "**/hooks",
+                  "**/hooks/**",
+                  "../hooks",
+                  "../hooks/**",
+                  "../../hooks",
+                  "../../hooks/**"
+                ],
+                "message": "src/core must not import src/hooks; the dependency direction is hooks -> core."
+              },
+              {
+                "group": [
+                  "**/platform",
+                  "**/platform/**",
+                  "../platform",
+                  "../platform/**",
+                  "../../platform",
+                  "../../platform/**"
+                ],
+                "message": "src/core must not import src/platform; core stays framework- and browser-agnostic, adapters depend on core."
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
 }

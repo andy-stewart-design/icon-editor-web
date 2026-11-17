@@ -1,32 +1,38 @@
-# React + TypeScript + Vite
+# Icon Editor
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+A browser-based editor for stroke-style SVG icons on a small artboard (typically 24×24). Designers draw with Line, Rectangle, Ellipse and Pen tools, refine with Node edit, and copy clean SVG out.
 
-Currently, two official plugins are available:
+The project is in early development. For the purpose, scope and plan, see [`.plans/mvp/overview.md`](.plans/mvp/overview.md). The `.plans/` directory is local and gitignored.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Stack
 
-## React Compiler
+React 19, TypeScript, Vite, Vitest and oxlint, managed with pnpm.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Layout
 
-## Expanding the Oxlint configuration
+- `src/core/`: framework-agnostic editor logic (document model, commands, geometry, serializer). Type-checked without the DOM library (`tsconfig.core.json`).
+- `src/platform/`: browser adapters (storage, clipboard, file I/O). Planned, not yet created.
+- `src/hooks/`: shared React hooks. Planned, not yet created.
+- `src/components/`: React components, one folder per component.
+- `src/main.tsx`: app entry point. `src/index.css`: global reset only.
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
+## Code conventions
 
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
-```
+- **Layout:** logic lives in `src/core`; React code lives in `src/components` and `src/hooks`; browser adapters live in `src/platform`.
+- **Components:** each component is a folder `src/components/<kebab-name>/` containing `index.tsx` (a default-exported function component) and `styles.module.css` (CSS Modules, imported as `s`). Do not use inline style objects.
+- **Structure:** component folders are flat by default. A sub-component used only by one parent lives in a subfolder of that parent, e.g. `src/components/toolbar/tool-button/`.
+- **Core boundary:** `src/core` never imports React, the DOM, `components`, `hooks` or `platform`. `pnpm lint` enforces this.
+- **Tests:** Vitest runs only in `node` and only covers pure core logic (`src/**/*.test.ts`). UI is verified manually in the browser.
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+## Scripts
+
+| Command | Description |
+| --- | --- |
+| `pnpm dev` | Start the Vite dev server |
+| `pnpm build` | Typecheck, then build the production bundle |
+| `pnpm preview` | Serve the production build locally |
+| `pnpm typecheck` | Run `tsc -b` across the app, core and node configs |
+| `pnpm lint` | Run oxlint, including the core import boundary |
+| `pnpm test` | Run the Vitest suite once |
+
+Install dependencies with `pnpm install`.
