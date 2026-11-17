@@ -159,3 +159,22 @@ describe('select tool handles', () => {
     expect(store.getState().history.past).toHaveLength(0)
   })
 })
+
+describe('select tool cursor', () => {
+  it('shows the resize arrow over a handle, grab over the rotate handle, default elsewhere', () => {
+    const r = makeRect(4, 4, 8, 8)
+    if (!r) throw new Error('degenerate rect')
+    const store = createEditorStore(docWith([r]))
+    store.setSelection({ shapeIds: [r.id], nodes: [] })
+    const tool = createSelectTool(store)
+
+    tool.hover(ev(12, 12)) // se
+    expect(tool.cursor).toBe('nwse-resize')
+    tool.hover(ev(12, 4)) // ne
+    expect(tool.cursor).toBe('nesw-resize')
+    tool.hover(ev(8, 4 - 22 / 16)) // rotate
+    expect(tool.cursor).toBe('grab')
+    tool.hover(ev(20, 20))
+    expect(tool.cursor).toBe('default')
+  })
+})

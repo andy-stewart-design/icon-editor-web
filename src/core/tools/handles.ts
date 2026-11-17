@@ -35,3 +35,26 @@ export function hitHandle(b: Rect, pt: Pt, zoom: number): HandleHit | null {
   for (const id of order) if (near(handlePoint(b, id))) return id
   return null
 }
+
+// CSS cursor for a handle: the resize arrow along its edge or corner, grab over the rotate handle, default
+// when nothing is under the pointer.
+export function handleCursor(hit: HandleHit | null): string {
+  switch (hit) {
+    case 'n':
+    case 's':
+      return 'ns-resize'
+    case 'e':
+    case 'w':
+      return 'ew-resize'
+    case 'nw':
+    case 'se':
+      return 'nwse-resize'
+    case 'ne':
+    case 'sw':
+      return 'nesw-resize'
+    case 'rotate':
+      return 'grab'
+    default:
+      return 'default'
+  }
+}

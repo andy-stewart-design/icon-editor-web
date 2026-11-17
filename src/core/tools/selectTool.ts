@@ -7,7 +7,7 @@ import { distanceToShape, shapeIntersectsRect } from '../geometry/hit'
 import type { IconDoc, Pt } from '../model'
 import type { EditorState } from '../store'
 import { snapIndicator } from './dragTool'
-import { hitHandle } from './handles'
+import { handleCursor, hitHandle, type HandleHit } from './handles'
 import { buildSnapFn } from './snapFn'
 import type { OverlayPrimitive, Tool, ToolEvent } from './types'
 
@@ -92,6 +92,17 @@ type Marquee = {
 export function createSelectTool(host: SelectHost): SelectTool {
   let mode: Move | Marquee | Resize | Rotate | null = null
   let hovered: string | null = null
+  let hoverCursor = 'default' // cursor while no gesture is active: the handle arrow under the pointer, if any
+
+  // The handle of the current selection under the pointer. A Shift-press on a shape toggles it instead, even when
+  // a handle sits on the shape's own stroke.
+  const handleUnder = (e: ToolEvent): { hit: HandleHit; bounds: Rect } | null => {
+    const { doc, selection } = host.getState()
+    const bounds = selectionBounds(doc.shapes.filter((s) => selection.shapeIds.includes(s.id)))
+    if (!bounds || (e.shift && hitTestShape(doc, e.pt, e.zoom) !== null)) return null
+    const hit = hitHandle(bounds, e.pt, e.zoom)
+    return hit ? { hit, bounds } : null
+  }
 
   // Moves the selection by the offset that puts the reference point on a snapped spot. The snap ignores the
   // moving shapes, so they don't stick to their own anchors.
@@ -132,18 +143,21 @@ export function createSelectTool(host: SelectHost): SelectTool {
   }
 
   return {
-    cursor: 'default',
+    get cursor() {
+      if (mode?.kind === 'resize') return handleCursor(mode.handle)
+      if (mode?.kind === 'rotate') return 'grabbing'
+      return hoverCursor
+    },
 
     pointerDown(e) {
       const { doc, selection } = host.getState()
       hovered = null
 
       // Handles of the current selection come before shape hits.
-      const picked = doc.shapes.filter((s) => selection.shapeIds.includes(s.id))
-      const selBounds = selectionBounds(picked)
-      // Shift-press on a shape toggles it, even when a handle sits on the shape's own stroke.
-      const toggling = e.shift && hitTestShape(doc, e.pt, e.zoom) !== null
-      const grabbed = selBounds && !toggling ? hitHandle(selBounds, e.pt, e.zoom) : null
+      const under = handleUnder(e)
+      const selBounds = under?.bounds ?? null
+      const grabbed = under?.hit ?? null
+      hoverCursor = handleCursor(grabbed)
       if (selBounds && grabbed) {
         const ids = [...selection.shapeIds]
         if (grabbed === 'rotate') {
@@ -204,6 +218,7 @@ export function createSelectTool(host: SelectHost): SelectTool {
     pointerUp(e) {
       const m = mode
       if (!m) return
+      hoverCursor = 'default'
       if (m.kind === 'marquee') {
         marqueeTo(m, e)
         mode = null
@@ -256,12 +271,14 @@ export function createSelectTool(host: SelectHost): SelectTool {
   function cancelGesture(): void {
     const m = mode
     mode = null
+    hoverCursor = 'default'
     if (m?.kind === 'move' || m?.kind === 'resize' || m?.kind === 'rotate') host.cancel()
     else if (m?.kind === 'marquee') host.setSelection(m.selectionBefore)
   }
 
   function hover(e: ToolEvent): void {
     if (mode) return
+    hoverCursor = handleCursor(handleUnder(e)?.hit ?? null)
     hovered = hitTestShape(host.getState().doc, e.pt, e.zoom)
   }
 }
