@@ -1,3 +1,4 @@
+import { resizeFactors, resizeRecipe, rotateRecipe, rotationAngle, type HandleId } from '../commands/transform'
 import { translateRecipe } from '../commands/selection'
 import type { Recipe } from '../commands'
 import type { Selection } from '../history'
@@ -6,6 +7,7 @@ import { distanceToShape, shapeIntersectsRect } from '../geometry/hit'
 import type { IconDoc, Pt } from '../model'
 import type { EditorState } from '../store'
 import { snapIndicator } from './dragTool'
+import { hitHandle } from './handles'
 import { buildSnapFn } from './snapFn'
 import type { OverlayPrimitive, Tool, ToolEvent } from './types'
 
@@ -70,6 +72,12 @@ type Move = {
   indicator: OverlayPrimitive[] // snap targets hit by the last update
 }
 
+// Dragging a resize handle. The bounds at press stay the reference, so each update rebuilds from the base doc.
+type Resize = { kind: 'resize'; handle: HandleId; bounds: Rect; ids: string[]; indicator: OverlayPrimitive[] }
+
+// Dragging the rotate handle. The angle is measured from the pointer at press around the bounds center.
+type Rotate = { kind: 'rotate'; center: Pt; start: Pt; ids: string[] }
+
 type Marquee = {
   kind: 'marquee'
   start: Pt
@@ -82,7 +90,7 @@ type Marquee = {
 // Press-drag on a shape moves the selection as one history transaction. Esc during a move restores the
 // pre-drag doc without a history entry.
 export function createSelectTool(host: SelectHost): SelectTool {
-  let mode: Move | Marquee | null = null
+  let mode: Move | Marquee | Resize | Rotate | null = null
   let hovered: string | null = null
 
   // Moves the selection by the offset that puts the reference point on a snapped spot. The snap ignores the
@@ -94,6 +102,22 @@ export function createSelectTool(host: SelectHost): SelectTool {
     const s = snap({ x: m.ref.x + dx, y: m.ref.y + dy })
     host.update(translateRecipe(m.ids, s.point.x - m.ref.x, s.point.y - m.ref.y))
     m.indicator = snapIndicator(s.targets)
+  }
+
+  const noop: Recipe = () => {}
+
+  // The dragged edge or corner snaps; the opposite side stays fixed.
+  const resizeTo = (m: Resize, e: ToolEvent): void => {
+    const snap = buildSnapFn(host.getState(), e.zoom, e.suspendSnap, new Set(m.ids))
+    const s = snap(e.pt)
+    const { sx, sy, anchor } = resizeFactors(m.bounds, m.handle, s.point, e.shift)
+    host.update(sx === 1 && sy === 1 ? noop : resizeRecipe(m.ids, sx, sy, anchor))
+    m.indicator = e.shift ? [] : snapIndicator(s.targets)
+  }
+
+  const rotateTo = (m: Rotate, e: ToolEvent): void => {
+    const angle = rotationAngle(m.center, m.start, e.pt, e.shift)
+    host.update(angle === 0 ? noop : rotateRecipe(m.ids, angle, m.center))
   }
 
   const marqueeTo = (m: Marquee, e: ToolEvent): void => {
@@ -112,8 +136,27 @@ export function createSelectTool(host: SelectHost): SelectTool {
 
     pointerDown(e) {
       const { doc, selection } = host.getState()
-      const pressed = hitTestShape(doc, e.pt, e.zoom)
       hovered = null
+
+      // Handles of the current selection come before shape hits.
+      const picked = doc.shapes.filter((s) => selection.shapeIds.includes(s.id))
+      const selBounds = selectionBounds(picked)
+      // Shift-press on a shape toggles it, even when a handle sits on the shape's own stroke.
+      const toggling = e.shift && hitTestShape(doc, e.pt, e.zoom) !== null
+      const grabbed = selBounds && !toggling ? hitHandle(selBounds, e.pt, e.zoom) : null
+      if (selBounds && grabbed) {
+        const ids = [...selection.shapeIds]
+        if (grabbed === 'rotate') {
+          host.begin('Rotate')
+          mode = { kind: 'rotate', center: { x: selBounds.x + selBounds.w / 2, y: selBounds.y + selBounds.h / 2 }, start: e.pt, ids }
+        } else {
+          host.begin('Resize')
+          mode = { kind: 'resize', handle: grabbed, bounds: selBounds, ids, indicator: [] }
+        }
+        return
+      }
+
+      const pressed = hitTestShape(doc, e.pt, e.zoom)
 
       if (pressed === null) {
         mode = {
@@ -151,7 +194,9 @@ export function createSelectTool(host: SelectHost): SelectTool {
     },
 
     pointerMove(e) {
-      if (mode?.kind === 'move') pressMove(e, mode)
+      if (mode?.kind === 'resize') resizeTo(mode, e)
+      else if (mode?.kind === 'rotate') rotateTo(mode, e)
+      else if (mode?.kind === 'move') pressMove(e, mode)
       else if (mode?.kind === 'marquee') marqueeTo(mode, e)
       else hover(e)
     },
@@ -162,6 +207,13 @@ export function createSelectTool(host: SelectHost): SelectTool {
       if (m.kind === 'marquee') {
         marqueeTo(m, e)
         mode = null
+        return
+      }
+      if (m.kind === 'resize' || m.kind === 'rotate') {
+        if (m.kind === 'resize') resizeTo(m, e)
+        else rotateTo(m, e)
+        mode = null
+        host.commit()
         return
       }
       pressMove(e, m)
@@ -191,7 +243,7 @@ export function createSelectTool(host: SelectHost): SelectTool {
     overlay() {
       const out: OverlayPrimitive[] = []
       if (mode?.kind === 'marquee') out.push({ kind: 'marquee', rect: mode.rect })
-      else if (mode?.kind === 'move') out.push(...mode.indicator)
+      else if (mode?.kind === 'move' || mode?.kind === 'resize') out.push(...mode.indicator)
       else if (hovered !== null) out.push({ kind: 'hover', shapeId: hovered })
       return out
     },
@@ -204,7 +256,7 @@ export function createSelectTool(host: SelectHost): SelectTool {
   function cancelGesture(): void {
     const m = mode
     mode = null
-    if (m?.kind === 'move') host.cancel()
+    if (m?.kind === 'move' || m?.kind === 'resize' || m?.kind === 'rotate') host.cancel()
     else if (m?.kind === 'marquee') host.setSelection(m.selectionBefore)
   }
 

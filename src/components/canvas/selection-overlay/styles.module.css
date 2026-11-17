@@ -12,3 +12,14 @@
   stroke: #1e7be0;
   stroke-width: 1px;
 }
+
+.handle {
+  fill: #fff;
+  stroke: #1e7be0;
+  stroke-width: 1px;
+}
+
+.stem {
+  stroke: #1e7be0;
+  stroke-width: 1px;
+}

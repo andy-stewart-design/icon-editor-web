@@ -1,5 +1,15 @@
 import { useEffect } from 'react'
-import { nudgeSelection, selectAll, type ActiveTool, type NudgeDir } from '../core'
+import {
+  bringForward,
+  deleteSelection,
+  duplicateSelection,
+  flipSelection,
+  nudgeSelection,
+  selectAll,
+  sendBackward,
+  type ActiveTool,
+  type NudgeDir,
+} from '../core'
 import { isEditable } from './editable'
 import { useEditorStore } from './use-editor'
 
@@ -28,6 +38,18 @@ export function useShortcuts(): void {
             store.dispatch(selectAll(store.getState().doc))
             return
           }
+          const { doc, selection } = store.getState()
+          const has = selection.shapeIds.length > 0
+          if (key === 'd' && !e.shiftKey) {
+            e.preventDefault() // browsers bookmark on Cmd/Ctrl+D
+            if (has && !e.repeat) store.dispatch(duplicateSelection(doc, selection))
+            return
+          }
+          if (e.key === ']' || e.key === '[') {
+            e.preventDefault()
+            if (has) store.dispatch(e.key === ']' ? bringForward(selection) : sendBackward(selection))
+            return
+          }
           if (key !== 'z') return
           e.preventDefault()
           if (e.shiftKey) store.redo()
@@ -40,6 +62,20 @@ export function useShortcuts(): void {
           e.preventDefault()
           if (e.repeat) return
           store.setUi({ snapEnabled: !store.getState().ui.snapEnabled })
+          return
+        }
+        if (e.key === 'Delete' || e.key === 'Backspace') {
+          const { selection } = store.getState()
+          if (selection.shapeIds.length === 0) return
+          e.preventDefault()
+          store.dispatch(deleteSelection(selection))
+          return
+        }
+        if (e.shiftKey && (key === 'h' || key === 'v')) {
+          const { selection } = store.getState()
+          if (selection.shapeIds.length === 0 || e.repeat) return
+          e.preventDefault()
+          store.dispatch(flipSelection(selection, key))
           return
         }
         const dir = ARROWS[e.key]

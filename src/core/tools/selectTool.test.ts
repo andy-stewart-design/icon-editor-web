@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { nudgeSelection, selectAll } from '../commands/selection'
-import { makeLine } from '../geometry/shapes'
+import { selectionBounds } from '../geometry/bounds'
+import { makeLine, makeRect } from '../geometry/shapes'
 import { createDefaultDoc, type IconDoc, type PathShape, type Pt } from '../model'
 import { createEditorStore } from '../store'
 import { createSelectTool, hitTestShape } from './selectTool'
@@ -127,6 +128,34 @@ describe('nudge and select-all commands (AC12)', () => {
     const store = createEditorStore(docWith([hline(2), hline(10)]))
     store.dispatch(selectAll(store.getState().doc))
     expect(store.getState().selection.shapeIds).toHaveLength(2)
+    expect(store.getState().history.past).toHaveLength(0)
+  })
+})
+
+describe('select tool handles', () => {
+  it('dragging the se handle resizes as one history entry; the rotate handle rotates; Esc restores', () => {
+    const r = makeRect(4, 4, 8, 8)
+    if (!r) throw new Error('degenerate rect')
+    const store = createEditorStore(docWith([r]))
+    store.setUi({ snapEnabled: false })
+    store.setSelection({ shapeIds: [r.id], nodes: [] })
+    const original = store.getState().doc
+    const tool = createSelectTool(store)
+
+    tool.pointerDown(ev(12, 12)) // the se corner
+    tool.pointerMove(ev(20, 20))
+    tool.pointerUp(ev(20, 20))
+    expect(selectionBounds([store.getState().doc.shapes[0]])).toEqual({ x: 4, y: 4, w: 16, h: 16 })
+    expect(store.getState().history.past).toHaveLength(1)
+
+    // Rotate handle: 22 screen px above the top edge at zoom 16, then a quarter turn about the center (12,12).
+    store.undo()
+    const top = 4 - 22 / 16
+    tool.pointerDown(ev(8, top))
+    tool.pointerMove(ev(8 + 4 + (4 - top), 8)) // pointer swings to the right of center
+    tool.pointerMove(ev(8, top)) // and back: no net rotation
+    tool.pointerCancel()
+    expect(store.getState().doc).toBe(original)
     expect(store.getState().history.past).toHaveLength(0)
   })
 })
