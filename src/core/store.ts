@@ -2,12 +2,14 @@ import { createStore } from 'zustand/vanilla'
 import { createCommands, type Command, type Recipe } from './commands'
 import { emptyHistory, emptySelection, type HistoryState, type Selection } from './history'
 import type { IconDoc } from './model'
+import type { Size, Viewport } from './viewport'
 
 export type ActiveTool = 'select' | 'node' | 'pen' | 'line' | 'rect' | 'ellipse'
 export type SnapIncrement = 1 | 0.5 | 0.25
 
 export type UiState = {
-  zoom: number
+  viewport: Viewport
+  canvasSize: Size // measured canvas element size in CSS px; 0 × 0 until the first measurement
   showGrid: boolean
   showSubgrid: boolean
   showKeylines: boolean
@@ -28,7 +30,8 @@ export type EditorState = {
 }
 
 export const defaultUi: UiState = {
-  zoom: 1,
+  viewport: { zoom: 16, panX: 0, panY: 0 },
+  canvasSize: { width: 0, height: 0 },
   showGrid: true,
   showSubgrid: false,
   showKeylines: false,

@@ -1,10 +1,5 @@
 .appShell {
   height: 100%;
   display: grid;
-  place-items: center;
-}
-
-.appTitle {
-  font-size: 1.5rem;
-  font-weight: 600;
+  grid-template-rows: auto minmax(0, 1fr);
 }

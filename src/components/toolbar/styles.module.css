@@ -1,0 +1,41 @@
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.375rem 0.5rem;
+  border-bottom: 1px solid #d4d4d4;
+  background: #fafafa;
+  font-size: 0.875rem;
+}
+
+.group {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.button {
+  font: inherit;
+  padding: 0.2rem 0.6rem;
+  border: 1px solid #c4c4c4;
+  border-radius: 4px;
+  background: #fff;
+  color: inherit;
+  cursor: pointer;
+}
+
+.button:hover {
+  background: #f0f0f0;
+}
+
+.button[aria-pressed='true'] {
+  background: #dcdcdc;
+}
+
+.zoom {
+  min-width: 4ch;
+  padding-left: 0.5rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}

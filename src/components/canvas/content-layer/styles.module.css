@@ -1,0 +1,6 @@
+.content {
+  position: absolute;
+  overflow: visible;
+  color: #111;
+  pointer-events: none;
+}

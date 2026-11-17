@@ -61,10 +61,21 @@ export function shapeAttributes(shape: Shape): Attr[] {
   return attrs
 }
 
+// One <path/> per shape that has any geometry; shapes with no nodes are skipped.
+const pathAttributes = (doc: IconDoc): Attr[][] =>
+  doc.shapes.map(shapeAttributes).filter((attrs) => attrs[0][1] !== '')
+
+const pathElement = (attrs: Attr[]): string => `<path${attrString(attrs)}/>`
+
+// The <path/> elements alone, with no separator and no root <svg>.
+export function serializeBody(doc: IconDoc): string {
+  return pathAttributes(doc).map(pathElement).join('')
+}
+
 export function serializeDoc(doc: IconDoc): string {
   const open = `<svg${attrString(rootAttributes(doc))}>`
-  const paths = doc.shapes.map(shapeAttributes).filter((attrs) => attrs[0][1] !== '')
+  const paths = pathAttributes(doc)
   if (paths.length === 0) return `${open}</svg>`
-  const body = paths.map((attrs) => `\n  <path${attrString(attrs)}/>`).join('')
+  const body = paths.map((attrs) => `\n  ${pathElement(attrs)}`).join('')
   return `${open}${body}\n</svg>`
 }

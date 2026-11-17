@@ -11,8 +11,8 @@ React 19, TypeScript, Vite, Vitest and oxlint, managed with pnpm.
 ## Layout
 
 - `src/core/`: framework-agnostic editor logic (document model, commands, geometry, serializer). Type-checked without the DOM library (`tsconfig.core.json`).
-- `src/platform/`: browser adapters (storage, clipboard, file I/O). Planned, not yet created.
-- `src/hooks/`: shared React hooks. Planned, not yet created.
+- `src/platform/`: browser adapters (IDs, dev tools; storage and clipboard later).
+- `src/hooks/`: shared React hooks (store access, viewport input).
 - `src/components/`: React components, one folder per component.
 - `src/main.tsx`: app entry point. `src/index.css`: global reset only.
 
@@ -36,3 +36,8 @@ React 19, TypeScript, Vite, Vitest and oxlint, managed with pnpm.
 | `pnpm test` | Run the Vitest suite once |
 
 Install dependencies with `pnpm install`.
+
+## Development
+
+In dev builds, `window.iconEditor` exposes `doc()`, `svg()`, `loadFixture()` and `store` for the browser console. It is not installed in production builds.
+Shortcuts: `0` fits the artboard, `1` shows 100%, `G` toggles the grid, Space or middle-drag pans, and Ctrl/Cmd+wheel or pinch zooms.
