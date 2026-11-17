@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest'
-import { createCounterIdGen } from './ids'
 import { createDefaultDoc, parseIconDoc, type IconDoc } from './model'
 
 const sampleDoc = (): IconDoc => ({
@@ -39,9 +38,9 @@ const sampleDoc = (): IconDoc => ({
 
 describe('createDefaultDoc', () => {
   it('uses the spec defaults', () => {
-    const doc = createDefaultDoc(createCounterIdGen())
+    const doc = createDefaultDoc()
     expect(doc).toEqual({
-      id: 'id1',
+      id: expect.any(String),
       version: 1,
       size: 24,
       strokeWidth: 1.5,

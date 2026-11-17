@@ -1,9 +1,4 @@
-export interface IdGen {
-  next(): string
-}
-
-// Deterministic generator for tests and core logic: id1, id2, ...
-export function createCounterIdGen(prefix = 'id'): IdGen {
-  let n = 0
-  return { next: () => `${prefix}${++n}` }
+// Core generates its own ids. The only source is crypto.randomUUID, declared in ./web-crypto.d.ts.
+export function newId(): string {
+  return globalThis.crypto.randomUUID()
 }

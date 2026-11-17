@@ -1,6 +1,5 @@
 import { actualSizeViewport, createDefaultDoc, fitViewport } from '../../core'
 import { useEditor, useEditorStore } from '../../hooks/use-editor'
-import { createUuidIdGen } from '../../platform/ids'
 import s from './styles.module.css'
 
 export default function Toolbar() {
@@ -22,7 +21,7 @@ export default function Toolbar() {
   // Autosave persists the replacement through subscribeCommitted; the viewport already fits the same artboard size.
   const newDocument = () => {
     if (!window.confirm('Start a new document? The current one will be replaced.')) return
-    store.replaceDocument(createDefaultDoc(createUuidIdGen()))
+    store.replaceDocument(createDefaultDoc())
   }
 
   return (

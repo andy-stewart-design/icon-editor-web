@@ -1,9 +1,7 @@
 import {
-  createCounterIdGen,
   serializeDoc,
   type EditorStore,
   type IconDoc,
-  type IdGen,
   type NodeMode,
   type PathNode,
   type PathShape,
@@ -11,6 +9,7 @@ import {
   type Shape,
   type Style,
   type Subpath,
+  newId,
 } from '../core'
 
 export type IconEditorDevTools = {
@@ -28,15 +27,15 @@ declare global {
 
 const KAPPA = 0.5523 // cubic handle length for a quarter circle, as a fraction of the radius
 
-function fixtureShapes(ids: IdGen): Shape[] {
+function fixtureShapes(): Shape[] {
   const node = (x: number, y: number, mode: NodeMode = 'corner', handles: { hIn?: Pt; hOut?: Pt } = {}): PathNode => ({
-    id: ids.next(),
+    id: newId(),
     p: { x, y },
     mode,
     ...handles,
   })
-  const sub = (nodes: PathNode[], closed = false): Subpath => ({ id: ids.next(), nodes, closed })
-  const path = (subpaths: Subpath[], style: Style = {}): PathShape => ({ id: ids.next(), type: 'path', subpaths, style })
+  const sub = (nodes: PathNode[], closed = false): Subpath => ({ id: newId(), nodes, closed })
+  const path = (subpaths: Subpath[], style: Style = {}): PathShape => ({ id: newId(), type: 'path', subpaths, style })
 
   const c = 12
   const r = 6
@@ -80,7 +79,7 @@ export function installDevTools(store: EditorStore): void {
       store.dispatch({
         label: 'Load fixture',
         recipe: (d) => {
-          d.shapes = fixtureShapes(createCounterIdGen('fx'))
+          d.shapes = fixtureShapes()
         },
       }),
   }

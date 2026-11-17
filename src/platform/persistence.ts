@@ -10,7 +10,6 @@ import {
   type SaveStatus,
 } from '../core'
 import { openIdbStore } from './idb-store'
-import { createUuidIdGen } from './ids'
 
 export type Session = { store: EditorStore; kv: KeyValueStore }
 
@@ -34,7 +33,7 @@ export function lazyIdbStore(): KeyValueStore {
 export async function loadSession(): Promise<Session> {
   try {
     const kv = await openIdbStore()
-    const { doc, notice } = await loadDocument(kv, createUuidIdGen(), () => Date.now())
+    const { doc, notice } = await loadDocument(kv, () => Date.now())
     let saveStatus: SaveStatus = 'ok'
     // No stored record for this id means a new or recovery doc: write it now so a record exists after load.
     try {
@@ -46,7 +45,7 @@ export async function loadSession(): Promise<Session> {
     store.setUi({ loadNotice: notice, saveStatus })
     return { store, kv }
   } catch {
-    const store = createEditorStore(createDefaultDoc(createUuidIdGen()))
+    const store = createEditorStore(createDefaultDoc())
     store.setUi({ saveStatus: 'failing' })
     return { store, kv: lazyIdbStore() }
   }

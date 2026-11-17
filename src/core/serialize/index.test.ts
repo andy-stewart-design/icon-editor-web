@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest'
-import { createCounterIdGen } from '../ids'
 import { createDefaultDoc, type IconDoc, type PathNode, type PathShape, type Subpath } from '../model'
 import { serializeDoc } from '.'
 
@@ -11,7 +10,7 @@ const shape = (id: string, subpaths: Subpath[], style: PathShape['style'] = {}):
   subpaths,
   style,
 })
-const docWith = (shapes: PathShape[]): IconDoc => ({ ...createDefaultDoc(createCounterIdGen()), shapes })
+const docWith = (shapes: PathShape[]): IconDoc => ({ ...createDefaultDoc(), shapes })
 
 const ROOT_OPEN =
   '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">'

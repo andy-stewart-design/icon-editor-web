@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest'
-import { createCounterIdGen } from './ids'
 import { createDefaultDoc, type IconDoc } from './model'
 import {
   CURRENT_KEY,
@@ -43,7 +42,7 @@ function manualTimer() {
   }
 }
 
-const docWith = (id: string): IconDoc => ({ ...createDefaultDoc(createCounterIdGen()), id })
+const docWith = (id: string): IconDoc => ({ ...createDefaultDoc(), id })
 const now = () => 1000
 
 describe('loadDocument', () => {
@@ -51,14 +50,14 @@ describe('loadDocument', () => {
     const kv = new MemoryKV()
     const doc = docWith('doc1')
     await saveDocument(kv, doc)
-    const result = await loadDocument(kv, createCounterIdGen(), now)
+    const result = await loadDocument(kv, now)
     expect(result).toEqual({ doc, notice: null })
   })
 
   it('opens a default document when nothing is stored', async () => {
-    const result = await loadDocument(new MemoryKV(), createCounterIdGen(), now)
+    const result = await loadDocument(new MemoryKV(), now)
     expect(result.notice).toBeNull()
-    expect(result.doc).toEqual(createDefaultDoc(createCounterIdGen()))
+    expect(result.doc).toEqual({ ...createDefaultDoc(), id: expect.any(String) })
   })
 
   it.each([
@@ -68,7 +67,7 @@ describe('loadDocument', () => {
     const kv = new MemoryKV()
     kv.data.set(CURRENT_KEY, 'doc1')
     kv.data.set(docKey('doc1'), bad)
-    const result = await loadDocument(kv, createCounterIdGen(), now)
+    const result = await loadDocument(kv, now)
     expect(result.notice).toBe('recovered')
     expect(result.doc.id).not.toBe('doc1')
     expect(kv.data.get(docKey('doc1'))).toBe(bad)
@@ -78,7 +77,7 @@ describe('loadDocument', () => {
   it('backs up a non-string current pointer under the unknown id', async () => {
     const kv = new MemoryKV()
     kv.data.set(CURRENT_KEY, 42)
-    const result = await loadDocument(kv, createCounterIdGen(), now)
+    const result = await loadDocument(kv, now)
     expect(result.notice).toBe('recovered')
     expect(kv.data.get('backup:unknown:1000')).toBe(42)
   })
@@ -89,7 +88,7 @@ describe('loadDocument', () => {
     kv.data.set(CURRENT_KEY, 'doc1')
     kv.data.set(docKey('doc1'), bad)
     kv.failSet = true
-    const result = await loadDocument(kv, createCounterIdGen(), now)
+    const result = await loadDocument(kv, now)
     expect(result.notice).toBe('recovered')
     expect(kv.data.get(docKey('doc1'))).toBe(bad)
   })

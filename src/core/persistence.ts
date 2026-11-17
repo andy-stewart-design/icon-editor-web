@@ -1,4 +1,3 @@
-import type { IdGen } from './ids'
 import { createDefaultDoc, parseIconDoc, type IconDoc } from './model'
 
 // Minimal async key-value port; the browser adapter (IndexedDB) lives in src/platform.
@@ -14,8 +13,8 @@ const backupKey = (id: string | null, timestamp: number): string => `backup:${id
 export type LoadResult = { doc: IconDoc; notice: null | 'recovered' }
 
 // Resolves with a document in every recoverable case. Rejects only when storage itself fails.
-export async function loadDocument(kv: KeyValueStore, ids: IdGen, now: () => number): Promise<LoadResult> {
-  const fresh = (notice: LoadResult['notice']): LoadResult => ({ doc: createDefaultDoc(ids), notice })
+export async function loadDocument(kv: KeyValueStore, now: () => number): Promise<LoadResult> {
+  const fresh = (notice: LoadResult['notice']): LoadResult => ({ doc: createDefaultDoc(), notice })
 
   // Keeps the unreadable value under a fresh backup key, probing past existing keys so nothing is overwritten.
   // If the backup fails we still open a new doc: its id is new, so no stored record is overwritten either way.

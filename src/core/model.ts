@@ -1,4 +1,4 @@
-import type { IdGen } from './ids'
+import { newId } from './ids'
 
 export type Pt = { x: number; y: number }
 export type NodeMode = 'corner' | 'smooth' | 'symmetric'
@@ -44,9 +44,9 @@ export type ParseResult =
   | { kind: 'invalid'; reason: string }
   | { kind: 'newerVersion'; version: number }
 
-export function createDefaultDoc(ids: IdGen): IconDoc {
+export function createDefaultDoc(): IconDoc {
   return {
-    id: ids.next(),
+    id: newId(),
     version: CURRENT_VERSION,
     size: 24,
     strokeWidth: 1.5,
