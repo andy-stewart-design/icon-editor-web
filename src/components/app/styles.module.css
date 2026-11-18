@@ -3,3 +3,15 @@
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
 }
+
+/* Canvas takes the remaining width; the properties panel keeps its fixed width. */
+.workspace {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+}
+
+.workspace > :first-child {
+  flex: 1 1 auto;
+  min-width: 0;
+}

@@ -1,6 +1,7 @@
 import { createStore } from 'zustand/vanilla'
 import { createCommands, type Command, type Recipe } from './commands'
 import { emptyHistory, emptySelection, type HistoryState, type Selection } from './history'
+import type { ResizeMode } from './commands/document'
 import type { IconDoc } from './model'
 import type { LoadResult, SaveStatus } from './persistence'
 import type { Size, Viewport } from './viewport'
@@ -18,6 +19,7 @@ export type UiState = {
   snapIncrement: SnapIncrement
   activeTool: ActiveTool
   rectRadius: number // corner radius for the Rectangle tool, in doc units; clamped when the rect is built
+  artboardResizeMode: ResizeMode // how shapes respond when the artboard size field commits; editor UI only
   saveStatus: SaveStatus // 'failing' while the last save attempt failed
   loadNotice: LoadResult['notice'] // set on boot when the stored document was replaced
 }
@@ -43,6 +45,7 @@ export const defaultUi: UiState = {
   snapIncrement: 0.5,
   activeTool: 'select',
   rectRadius: 0,
+  artboardResizeMode: 'keep',
   saveStatus: 'ok',
   loadNotice: null,
 }

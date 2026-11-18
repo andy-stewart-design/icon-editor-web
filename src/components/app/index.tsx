@@ -5,6 +5,7 @@ import { installDevTools } from '../../platform/dev-tools'
 import { loadSession, startPersistence, type Session } from '../../platform/persistence'
 import Canvas from '../canvas'
 import Notices from '../notices'
+import PropertiesPanel from '../properties-panel'
 import Toolbar from '../toolbar'
 import s from './styles.module.css'
 
@@ -43,7 +44,10 @@ export default function App() {
       <Shortcuts />
       <main className={s.appShell}>
         <Toolbar />
-        <Canvas />
+        <div className={s.workspace}>
+          <Canvas />
+          <PropertiesPanel />
+        </div>
         <Notices />
       </main>
     </EditorContext>

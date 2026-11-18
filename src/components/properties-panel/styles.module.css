@@ -1,0 +1,8 @@
+.panel {
+  flex: 0 0 15rem;
+  min-height: 0;
+  overflow-y: auto;
+  border-left: 1px solid #d4d4d4;
+  background: #fafafa;
+  font-size: 0.875rem;
+}
