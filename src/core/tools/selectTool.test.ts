@@ -109,6 +109,32 @@ describe('select tool drag-move (AC37, AC38)', () => {
   })
 })
 
+describe('select tool click versus drag', () => {
+  it('a click on an off-grid shape leaves it where it is, even with snapping on; a real drag snaps', () => {
+    const line = makeLine({ x: 2.13, y: 4.07 }, { x: 22.13, y: 4.07 })!
+    const store = createEditorStore(docWith([line]))
+    store.setUi({ snapEnabled: true, snapIncrement: 0.5 })
+    const original = store.getState().doc
+    const tool = createSelectTool(store)
+
+    // Press, with a sub-threshold wobble (1 screen px at zoom 16); x = 8 stays clear of the resize handles, then release.
+    tool.pointerDown(ev(8, 4.07))
+    tool.pointerMove(ev(8.06, 4.07))
+    tool.pointerUp(ev(8.06, 4.07))
+    expect(store.getState().doc).toBe(original)
+    expect(store.getState().history.past).toHaveLength(0)
+    expect(store.getState().selection.shapeIds).toEqual([line.id])
+
+    // A real drag still snaps the bounds corner to the grid.
+    tool.pointerDown(ev(8, 4.07))
+    tool.pointerMove(ev(9, 4.07))
+    tool.pointerUp(ev(9, 4.07))
+    const p = store.getState().doc.shapes[0].subpaths[0].nodes[0].p
+    expect(p.x * 2).toBeCloseTo(Math.round(p.x * 2), 9)
+    expect(store.getState().history.past).toHaveLength(1)
+  })
+})
+
 describe('nudge and select-all commands (AC12)', () => {
   it('moves by the increment (even with snapping off) or 1 unit with Shift, one entry each', () => {
     const line = hline(4)

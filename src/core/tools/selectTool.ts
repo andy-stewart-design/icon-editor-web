@@ -14,6 +14,10 @@ import type { OverlayPrimitive, Tool, ToolEvent } from './types'
 // Screen px of slop around the centreline, on top of half the stroke width.
 export const HIT_TOLERANCE_PX = 6
 
+// Screen px the pointer must travel from the press before a press on a shape counts as a drag. Until then the
+// shape doesn't move, so a click never snaps it to the grid.
+export const DRAG_THRESHOLD_PX = 3
+
 // What the Select tool needs from the store. The editor store satisfies it structurally.
 export type SelectHost = {
   getState: () => Pick<EditorState, 'doc' | 'selection' | 'ui'>
@@ -137,9 +141,10 @@ export function createSelectTool(host: SelectHost): SelectTool {
     host.setSelection({ shapeIds: unionIds(m.base, hits), nodes: [] })
   }
 
+  // A press only becomes a move once the pointer leaves the dead zone. After that the shape follows the full offset.
   const pressMove = (e: ToolEvent, m: Move): void => {
-    if (e.pt.x !== m.start.x || e.pt.y !== m.start.y) m.dragged = true
-    moveTo(m, e)
+    if (!m.dragged && Math.hypot(e.pt.x - m.start.x, e.pt.y - m.start.y) * e.zoom >= DRAG_THRESHOLD_PX) m.dragged = true
+    if (m.dragged) moveTo(m, e)
   }
 
   return {
