@@ -8,6 +8,7 @@ import {
   type SnapIncrement,
 } from '../../core'
 import { useEditor, useEditorStore } from '../../hooks/use-editor'
+import CopySvgButton from '../copy-svg-button'
 import s from './styles.module.css'
 
 const SNAP_INCREMENTS: readonly SnapIncrement[] = [1, 0.5, 0.25]
@@ -140,6 +141,7 @@ export default function Toolbar() {
         </div>
       </div>
       <div className={s.group}>
+        <CopySvgButton />
         <button type="button" className={s.button} onClick={fit}>
           Fit
         </button>
