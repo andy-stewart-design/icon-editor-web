@@ -28,20 +28,32 @@ const safe = (k: number): number => (Math.abs(k) < MIN_SCALE ? (k < 0 ? -MIN_SCA
 
 // Scale factors for dragging `handle` of `bounds` to `pt`. The anchor is the opposite edge or corner, which stays
 // fixed. An edge handle changes one axis only. With keepAspect both axes scale by the same magnitude; for an edge
-// handle the other axis then scales about the center of the bounds.
-export function resizeFactors(bounds: Rect, handle: HandleId, pt: Pt, keepAspect = false): ResizeFactors {
+// handle the other axis then scales about the center of the bounds. With fromCenter (Alt) the anchor is the center
+// of the bounds instead, so the shape grows or shrinks symmetrically about it.
+export function resizeFactors(
+  bounds: Rect,
+  handle: HandleId,
+  pt: Pt,
+  keepAspect = false,
+  fromCenter = false,
+): ResizeFactors {
   const left = handle.includes('w')
   const right = handle.includes('e')
   const top = handle.includes('n')
   const bottom = handle.includes('s')
-  const anchor: Pt = {
-    x: left ? bounds.x + bounds.w : right ? bounds.x : bounds.x + bounds.w / 2,
-    y: top ? bounds.y + bounds.h : bottom ? bounds.y : bounds.y + bounds.h / 2,
-  }
+  const anchor: Pt = fromCenter
+    ? { x: bounds.x + bounds.w / 2, y: bounds.y + bounds.h / 2 }
+    : {
+        x: left ? bounds.x + bounds.w : right ? bounds.x : bounds.x + bounds.w / 2,
+        y: top ? bounds.y + bounds.h : bottom ? bounds.y : bounds.y + bounds.h / 2,
+      }
+  // Distance from the anchor to the dragged edge at press: the full side, or half of it from the center.
+  const reachW = fromCenter ? bounds.w / 2 : bounds.w
+  const reachH = fromCenter ? bounds.h / 2 : bounds.h
   let sx = 1
   let sy = 1
-  if ((left || right) && bounds.w > 0) sx = safe((pt.x - anchor.x) / (right ? bounds.w : -bounds.w))
-  if ((top || bottom) && bounds.h > 0) sy = safe((pt.y - anchor.y) / (bottom ? bounds.h : -bounds.h))
+  if ((left || right) && bounds.w > 0) sx = safe((pt.x - anchor.x) / (right ? reachW : -reachW))
+  if ((top || bottom) && bounds.h > 0) sy = safe((pt.y - anchor.y) / (bottom ? reachH : -reachH))
   if (keepAspect) {
     const horizontal = left || right
     const vertical = top || bottom

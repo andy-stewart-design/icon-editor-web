@@ -41,6 +41,17 @@ describe('transform commands', () => {
     expect(f.sy).toBeCloseTo(2)
   })
 
+  it('Alt resizes about the center of the bounds', () => {
+    const b = { x: 4, y: 4, w: 8, h: 4 } // center (8, 6)
+    const f = resizeFactors(b, 'se', { x: 16, y: 10 }, false, true) // pointer 8 right, 4 below the center
+    expect(f.anchor).toEqual({ x: 8, y: 6 })
+    expect(f.sx).toBeCloseTo(2)
+    expect(f.sy).toBeCloseTo(2)
+    const e = resizeFactors(b, 'w', { x: 0, y: 6 }, false, true) // west edge dragged to 8 left of the center
+    expect(e.sx).toBeCloseTo(2)
+    expect(e.sy).toBe(1)
+  })
+
   it('flipping twice on the same axis restores the coordinates (AC25)', () => {
     const r = rect(2, 3, 5, 4)
     const { store, select } = setup([r])

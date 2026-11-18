@@ -125,7 +125,7 @@ export function createSelectTool(host: SelectHost): SelectTool {
   const resizeTo = (m: Resize, e: ToolEvent): void => {
     const snap = buildSnapFn(host.getState(), e.zoom, e.suspendSnap, new Set(m.ids))
     const s = snap(e.pt)
-    const { sx, sy, anchor } = resizeFactors(m.bounds, m.handle, s.point, e.shift)
+    const { sx, sy, anchor } = resizeFactors(m.bounds, m.handle, s.point, e.shift, e.alt)
     host.update(sx === 1 && sy === 1 ? noop : resizeRecipe(m.ids, sx, sy, anchor))
     m.indicator = e.shift ? [] : snapIndicator(s.targets)
   }
