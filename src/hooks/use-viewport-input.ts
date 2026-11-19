@@ -1,5 +1,5 @@
 import { useEffect, type RefObject } from 'react'
-import { actualSizeViewport, fitViewport, zoomAt, type Pt, type Viewport } from '../core'
+import { zoomAt, type Pt, type Viewport } from '../core'
 import { isEditable } from './editable'
 import { useEditorStore } from './use-editor'
 
@@ -15,7 +15,7 @@ function wheelPx(e: WheelEvent, pageHeight: number): Pt {
   return { x: e.deltaX * unit, y: e.deltaY * unit }
 }
 
-// Viewport input for the canvas element: wheel and pinch zoom and pan, middle or Space drag, and view shortcuts.
+// Viewport input for the canvas element: wheel and pinch zoom and pan, and middle or Space drag.
 // Changes go through setUi, so they never create history entries.
 export function useViewportInput(ref: RefObject<HTMLDivElement | null>): void {
   const store = useEditorStore()
@@ -130,24 +130,18 @@ export function useViewportInput(ref: RefObject<HTMLDivElement | null>): void {
     el.addEventListener('pointercancel', endDrag, { signal })
     el.addEventListener('lostpointercapture', endDrag, { signal })
 
-    // Shortcuts are ignored while typing in a field or with Cmd, Ctrl or Alt held.
+    // Space is hold-to-pan, not a shortcut, so it is handled here rather than in use-shortcuts. Ignored in fields
+    // and with Cmd, Ctrl or Alt held. Fit, 100% and grid live in the shortcut table.
     window.addEventListener(
       'keydown',
       (e) => {
         if (e.metaKey || e.ctrlKey || e.altKey || isEditable(e.target)) return
-        if (e.key === ' ') {
-          e.preventDefault() // no page scroll
-          if (!e.repeat) {
-            spaceHeld = true
-            syncCursor()
-          }
-          return
+        if (e.key !== ' ') return
+        e.preventDefault() // no page scroll
+        if (!e.repeat) {
+          spaceHeld = true
+          syncCursor()
         }
-        if (e.repeat) return
-        const { doc, ui } = store.getState()
-        if (e.key === '0') store.setUi({ viewport: fitViewport(ui.canvasSize, doc.size, doc.size) })
-        else if (e.key === '1') store.setUi({ viewport: actualSizeViewport(ui.canvasSize, doc.size, doc.size) })
-        else if (e.key === 'g' || e.key === 'G') store.setUi({ showGrid: !ui.showGrid })
       },
       { signal },
     )
