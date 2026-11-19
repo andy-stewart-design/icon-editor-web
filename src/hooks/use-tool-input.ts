@@ -205,6 +205,23 @@ export function useToolInput(): ToolInput {
     }
   }, [store, tool])
 
+  // Doc changes made without a pointer move (arrow-key nudge, panel edit, undo, redo) can leave the tool's hover
+  // feedback out of date. Refresh it when the doc changes while no press is in progress. Gesture edits are skipped
+  // because the gesture is active. The press-end commit runs after the gesture is cleared, but the tool forgets its
+  // hover point at press start, so that refresh is a no-op. bump() only re-renders and never changes the doc.
+  useEffect(() => {
+    if (!tool?.refreshHover) return
+    let doc = store.getState().doc
+    return store.subscribe(() => {
+      const next = store.getState().doc
+      if (next === doc) return
+      doc = next
+      if (gestureRef.current) return
+      tool.refreshHover?.()
+      bump()
+    })
+  }, [store, tool])
+
   // Window-level keys. Escape cancels the draft (the Pen tool finishes its path instead), and Enter is forwarded
   // for the Pen tool to finish. Modifier changes during a press re-send the last position so the preview picks up
   // the new shift, alt, and snap state without the pointer moving.

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { deleteSelectedNodes } from '../commands/nodes'
+import { deleteSelectedNodes, translateNodes } from '../commands/nodes'
 import { evalSegment, segmentsOf } from '../geometry/segments'
 import { newId } from '../ids'
 import type { NodeRef, Selection } from '../history'
@@ -240,5 +240,50 @@ describe('node tool hit testing and overlay', () => {
     const overlay = nodeOverlay(doc, { ...sel, nodes: [refOf(s, b)] })
     expect(overlay.filter((p) => p.kind === 'anchor')).toHaveLength(2)
     expect(overlay.filter((p) => p.kind === 'handle')).toEqual([{ kind: 'handle', from: { x: 12, y: 12 }, to: { x: 16, y: 12 } }])
+  })
+})
+
+describe('node tool hover refresh after a doc change without pointer movement', () => {
+  // Straight segment from a (2, 20) to b (22, 20). The pointer sits on it at (12, 20).
+  function straight() {
+    const a = n({ x: 2, y: 20 })
+    const b = n({ x: 22, y: 20 })
+    const s = shape([a, b])
+    return { s, a, b }
+  }
+
+  it('clears the segment highlight when the segment moves away from the pointer', () => {
+    const { s, a, b } = straight()
+    const { store, tool } = setup([s], { shapeIds: [s.id], nodes: [refOf(s, b)] })
+    tool.hover(ev(12, 20))
+    expect(tool.overlay().some((p) => p.kind === 'segmentHover')).toBe(true)
+
+    store.dispatch(translateNodes(store.getState().selection, 0, 20))
+    tool.refreshHover()
+    expect(tool.overlay().some((p) => p.kind === 'segmentHover')).toBe(false)
+    expect(nodeOf(store, s, b.id).p).toEqual({ x: 22, y: 40 })
+    expect(nodeOf(store, s, a.id).p).toEqual({ x: 2, y: 20 })
+  })
+
+  it('updates the segment highlight to the new geometry while the pointer is still on the segment', () => {
+    const { s, a } = straight()
+    const { store, tool } = setup([s], { shapeIds: [s.id], nodes: [{ shapeId: s.id, subpathId: s.subpaths[0].id, nodeId: a.id }] })
+    tool.hover(ev(12, 20))
+
+    store.dispatch(translateNodes(store.getState().selection, -2, 0))
+    tool.refreshHover()
+    const hl = tool.overlay().find((p) => p.kind === 'segmentHover')
+    expect(hl).toBeDefined()
+    const seg = segmentsOf(store.getState().doc.shapes[0].subpaths[0])[0]
+    expect(hl).toEqual({ kind: 'segmentHover', from: seg.from.p, c1: seg.c1, c2: seg.c2, to: seg.to.p })
+    expect(hl).toMatchObject({ from: { x: 0, y: 20 }, to: { x: 22, y: 20 } })
+  })
+
+  it('does nothing before any hover position is known', () => {
+    const { s, b } = straight()
+    const { store, tool } = setup([s], { shapeIds: [s.id], nodes: [{ shapeId: s.id, subpathId: s.subpaths[0].id, nodeId: b.id }] })
+    store.dispatch(translateNodes(store.getState().selection, 0, 20))
+    tool.refreshHover()
+    expect(tool.overlay()).toEqual([])
   })
 })

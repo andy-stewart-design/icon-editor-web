@@ -45,6 +45,10 @@ export interface Tool {
   overlay(): OverlayPrimitive[]
   // Plain pointer moves with no button held. The host calls it only when the method exists (Select and Pen use it).
   hover?(e: ToolEvent): void
+  // Re-evaluates the hover feedback at the last hover position against the current doc, for when the doc changed
+  // without a pointer move (arrow-key nudge, panel edit, undo). The host calls it after such changes. No-op when no
+  // hover position is known or a gesture is active.
+  refreshHover?(): void
   // Called when the host replaces the tool (another tool is selected or the tool is torn down). Tools with work to
   // commit do it here. Other tools leave it out.
   deactivate?(): void

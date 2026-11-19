@@ -30,6 +30,7 @@ export type NodeHost = {
 export type NodeTool = Tool & {
   // Hover tracking for when no gesture is active. The host calls it on plain pointer moves.
   hover: (e: ToolEvent) => void
+  refreshHover: () => void
 }
 
 // What a press landed on. Handles and anchors belong to selected nodes or to the anchors of selected shapes. A segment
@@ -188,6 +189,9 @@ export function createNodeTool(host: NodeHost): NodeTool {
   let gesture: Gesture | null = null
   let hoverPrim: OverlayPrimitive | null = null
   let hoverCursor = 'default'
+  // Last pointer position seen by hover(), in doc space with the zoom it was measured at. Cleared when a press starts
+  // and when the tool is deactivated, so a refresh never uses a point from before the press.
+  let lastHover: { pt: Pt; zoom: number } | null = null
 
   const setHover = (hit: NodeHit | null, doc: IconDoc, pt: Pt, zoom: number, sel: Selection): void => {
     hoverPrim = null
@@ -266,6 +270,7 @@ export function createNodeTool(host: NodeHost): NodeTool {
       const { doc, selection } = host.getState()
       hoverPrim = null
       const hit = hitNode(doc, selection, e.pt, e.zoom)
+      lastHover = null
 
       if (hit?.kind === 'handle') {
         host.begin('Move handle')
@@ -392,11 +397,28 @@ export function createNodeTool(host: NodeHost): NodeTool {
     },
 
     hover,
+
+    refreshHover() {
+      if (gesture || !lastHover) return
+      applyHover(lastHover.pt, lastHover.zoom)
+    },
+
+    deactivate() {
+      lastHover = null
+      hoverPrim = null
+      hoverCursor = 'default'
+    },
   }
 
   function hover(e: ToolEvent): void {
     if (gesture) return
+    lastHover = { pt: e.pt, zoom: e.zoom }
+    applyHover(e.pt, e.zoom)
+  }
+
+  // Hover feedback for a point against the current doc and selection. Shared by pointer moves and refreshes.
+  function applyHover(pt: Pt, zoom: number): void {
     const { doc, selection } = host.getState()
-    setHover(hitNode(doc, selection, e.pt, e.zoom), doc, e.pt, e.zoom, selection)
+    setHover(hitNode(doc, selection, pt, zoom), doc, pt, zoom, selection)
   }
 }
