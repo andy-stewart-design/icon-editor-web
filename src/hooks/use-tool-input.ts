@@ -3,9 +3,9 @@ import {
   buildSnapFn,
   createEllipseTool,
   createLineTool,
+  createPenTool,
   createRectTool,
   createSelectTool,
-  type SelectTool,
   screenToDoc,
   type ActiveTool,
   type EditorStore,
@@ -59,14 +59,14 @@ function createTool(store: EditorStore, activeTool: ActiveTool, rectRadius: numb
       return createRectTool({ host: store, radius: () => rectRadius })
     case 'ellipse':
       return createEllipseTool(store)
+    case 'pen':
+      return createPenTool(store)
     case 'select':
       return createSelectTool(store)
     default:
       return null
   }
 }
-
-const isSelectTool = (tool: Tool): tool is SelectTool => 'hover' in tool
 
 // Builds the ToolEvent for one moment: the doc point under the canvas-local position, under the current viewport.
 function toolEvent(store: EditorStore, local: Pt, mods: Modifiers, space: boolean): ToolEvent {
@@ -105,6 +105,7 @@ export function useToolInput(): ToolInput {
       clearGesture(gestureRef.current)
       gestureRef.current = null
       tool?.pointerCancel()
+      tool?.deactivate?.()
     },
     [tool],
   )
@@ -157,8 +158,8 @@ export function useToolInput(): ToolInput {
       },
       onPointerMove(e) {
         const g = gestureRef.current
-        // Plain moves reach only the select tool, so its hover highlight follows the pointer.
-        if (tool && !g && isSelectTool(tool)) {
+        // Plain moves (no press) reach only tools with a hover method: the select highlight and the pen rubber band.
+        if (tool && !g && tool.hover) {
           tool.hover(toolEvent(store, localOf(e), e, spaceRef.current))
           bump()
           return
@@ -201,8 +202,9 @@ export function useToolInput(): ToolInput {
     }
   }, [store, tool])
 
-  // Window-level keys. Escape cancels the draft. Modifier changes during a press re-send the last position
-  // so the preview picks up the new shift, alt, and snap state without the pointer moving.
+  // Window-level keys. Escape cancels the draft (the Pen tool finishes its path instead), and Enter is forwarded
+  // for the Pen tool to finish. Modifier changes during a press re-send the last position so the preview picks up
+  // the new shift, alt, and snap state without the pointer moving.
   useEffect(() => {
     if (!tool) return
     const controller = new AbortController()
@@ -211,7 +213,14 @@ export function useToolInput(): ToolInput {
     window.addEventListener(
       'keydown',
       (e) => {
-        if (e.key === 'Escape') {
+        // Keys typed into a field belong to the field, so Escape and Enter are not sent to the tool there.
+        if (e.key === 'Escape' || e.key === 'Enter') {
+          if (isEditable(e.target)) return
+          if (e.key === 'Enter') {
+            tool.keyDown('Enter')
+            bump()
+            return
+          }
           clearGesture(gestureRef.current)
           gestureRef.current = null
           tool.keyDown('Escape')

@@ -4,6 +4,9 @@ import s from './styles.module.css'
 
 const SNAP_RING_RADIUS = 4 // screen px
 const HOVER_EXTRA_PX = 4 // screen px added to the shape's stroke width so the hover halo reads around it
+const ANCHOR_HALF = 3 // half the side of a node square, screen px
+const HANDLE_DOT_RADIUS = 3 // screen px
+const CLOSE_RING_RADIUS = 7 // screen px
 
 // Draft markup matches the content layer: the document's stroke width, caps and joins apply unless the shape overrides them.
 function DraftPath({ shape, doc }: { shape: PathShape; doc: IconDoc }) {
@@ -57,6 +60,33 @@ export default function ToolOverlay({ primitives }: { primitives: OverlayPrimiti
         if (p.kind === 'snapPoint') {
           const c = docToScreen(vp, p.p)
           return <circle key={i} className={s.snapPoint} cx={c.x} cy={c.y} r={SNAP_RING_RADIUS} />
+        }
+        if (p.kind === 'anchor') {
+          const c = docToScreen(vp, p.p)
+          return (
+            <rect
+              key={i}
+              className={s.anchor}
+              x={c.x - ANCHOR_HALF}
+              y={c.y - ANCHOR_HALF}
+              width={ANCHOR_HALF * 2}
+              height={ANCHOR_HALF * 2}
+            />
+          )
+        }
+        if (p.kind === 'handle') {
+          const from = docToScreen(vp, p.from)
+          const to = docToScreen(vp, p.to)
+          return (
+            <g key={i}>
+              <line className={s.handleLine} x1={from.x} y1={from.y} x2={to.x} y2={to.y} />
+              <circle className={s.handleDot} cx={to.x} cy={to.y} r={HANDLE_DOT_RADIUS} />
+            </g>
+          )
+        }
+        if (p.kind === 'closeTarget') {
+          const c = docToScreen(vp, p.p)
+          return <circle key={i} className={s.closeTarget} cx={c.x} cy={c.y} r={CLOSE_RING_RADIUS} />
         }
         if (p.kind === 'snapLine') {
           if (p.axis === 'x') {

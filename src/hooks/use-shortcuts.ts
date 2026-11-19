@@ -14,7 +14,7 @@ import { isEditable } from './editable'
 import { useEditorStore } from './use-editor'
 
 // Tool letters from the spec's keyboard table.
-const TOOL_KEYS: Record<string, ActiveTool> = { v: 'select', l: 'line', r: 'rect', e: 'ellipse' }
+const TOOL_KEYS: Record<string, ActiveTool> = { v: 'select', p: 'pen', l: 'line', r: 'rect', e: 'ellipse' }
 const ARROWS: Record<string, NudgeDir> = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' }
 
 // App-wide shortcuts. Grid (G), view (0, 1) and Space pan stay in use-viewport-input.

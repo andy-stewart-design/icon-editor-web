@@ -40,3 +40,27 @@
   stroke: #1e7be0;
   stroke-width: 1px;
 }
+
+/* Pen tool feedback, all constant screen size. */
+.anchor {
+  fill: #fff;
+  stroke: #1e7be0;
+  stroke-width: 1px;
+}
+
+.handleLine {
+  stroke: #1e7be0;
+  stroke-width: 1px;
+}
+
+.handleDot {
+  fill: #fff;
+  stroke: #1e7be0;
+  stroke-width: 1px;
+}
+
+.closeTarget {
+  fill: none;
+  stroke: #1e7be0;
+  stroke-width: 2px;
+}
