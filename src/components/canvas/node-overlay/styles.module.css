@@ -1,0 +1,33 @@
+.layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+/* Unselected anchor: hollow square. */
+.anchor {
+  fill: #fff;
+  stroke: #1e7be0;
+  stroke-width: 1px;
+}
+
+/* Selected anchor: filled square. */
+.anchorSelected {
+  fill: #1e7be0;
+  stroke: #1e7be0;
+  stroke-width: 1px;
+}
+
+.handleLine {
+  stroke: #1e7be0;
+  stroke-width: 1px;
+}
+
+.handleDot {
+  fill: #fff;
+  stroke: #1e7be0;
+  stroke-width: 1px;
+}

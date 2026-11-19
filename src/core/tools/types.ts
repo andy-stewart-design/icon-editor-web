@@ -23,8 +23,10 @@ export type OverlayPrimitive =
   | { kind: 'snapLine'; axis: 'x' | 'y'; value: number } // a straight target (edge, center or guide) was hit
   | { kind: 'hover'; shapeId: string } // Select tool: the shape under the pointer, when no gesture is active
   | { kind: 'marquee'; rect: Rect } // Select tool: the marquee being dragged, in doc units
-  | { kind: 'anchor'; p: Pt } // Pen tool: a placed node, drawn at a constant screen size
+  | { kind: 'anchor'; p: Pt; selected?: boolean } // a node, drawn at a constant screen size; Node tool: selected = highlighted
   | { kind: 'handle'; from: Pt; to: Pt } // a node's handle: a line from the anchor and a dot at the handle
+  | { kind: 'nodeHover'; p: Pt } // Node tool: ring on the anchor or handle under the pointer (no gesture active)
+  | { kind: 'segmentHover'; from: Pt; c1: Pt; c2: Pt; to: Pt } // Node tool: the segment under the pointer, as a cubic (c1 = from and c2 = to when straight)
   | { kind: 'closeTarget'; p: Pt } // Pen tool: ring on the first node while a click would close the path
 
 // The store satisfies this structurally. Each tool commit is one dispatch, so it is one history entry.

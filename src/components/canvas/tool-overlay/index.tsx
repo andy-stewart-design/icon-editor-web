@@ -7,6 +7,7 @@ const HOVER_EXTRA_PX = 4 // screen px added to the shape's stroke width so the h
 const ANCHOR_HALF = 3 // half the side of a node square, screen px
 const HANDLE_DOT_RADIUS = 3 // screen px
 const CLOSE_RING_RADIUS = 7 // screen px
+const HOVER_RING_HALF = 6 // half the side of the node hover ring, screen px
 
 // Draft markup matches the content layer: the document's stroke width, caps and joins apply unless the shape overrides them.
 function DraftPath({ shape, doc }: { shape: PathShape; doc: IconDoc }) {
@@ -66,7 +67,7 @@ export default function ToolOverlay({ primitives }: { primitives: OverlayPrimiti
           return (
             <rect
               key={i}
-              className={s.anchor}
+              className={p.selected ? s.anchorSelected : s.anchor}
               x={c.x - ANCHOR_HALF}
               y={c.y - ANCHOR_HALF}
               width={ANCHOR_HALF * 2}
@@ -105,6 +106,25 @@ export default function ToolOverlay({ primitives }: { primitives: OverlayPrimiti
             </g>
           )
         }
+        if (p.kind === 'nodeHover') {
+          const c = docToScreen(vp, p.p)
+          return <rect key={i} className={s.nodeHover} x={c.x - HOVER_RING_HALF} y={c.y - HOVER_RING_HALF} width={HOVER_RING_HALF * 2} height={HOVER_RING_HALF * 2} />
+        }
+        if (p.kind === 'segmentHover') {
+          const a = docToScreen(vp, p.from)
+          const c1 = docToScreen(vp, p.c1)
+          const c2 = docToScreen(vp, p.c2)
+          const b = docToScreen(vp, p.to)
+          return (
+            <path
+              key={i}
+              className={s.segmentHover}
+              d={`M${a.x} ${a.y}C${c1.x} ${c1.y} ${c2.x} ${c2.y} ${b.x} ${b.y}`}
+            />
+          )
+        }
+        // Node-tool anchors and handles are drawn by the node overlay, which renders the static display.
+        if (p.kind !== 'marquee') return null
         // Marquee corners are mapped to screen space so the border stays 1px at any zoom.
         const a = docToScreen(vp, { x: p.rect.x, y: p.rect.y })
         const b = docToScreen(vp, { x: p.rect.x + p.rect.w, y: p.rect.y + p.rect.h })

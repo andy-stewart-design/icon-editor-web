@@ -3,6 +3,7 @@ import {
   buildSnapFn,
   createEllipseTool,
   createLineTool,
+  createNodeTool,
   createPenTool,
   createRectTool,
   createSelectTool,
@@ -63,6 +64,8 @@ function createTool(store: EditorStore, activeTool: ActiveTool, rectRadius: numb
       return createPenTool(store)
     case 'select':
       return createSelectTool(store)
+    case 'node':
+      return createNodeTool(store)
     default:
       return null
   }

@@ -2,10 +2,13 @@ import { useEffect } from 'react'
 import {
   bringForward,
   deleteSelection,
+  deleteSelectedNodes,
   duplicateSelection,
   flipSelection,
+  nudgeAmount,
   nudgeSelection,
   selectAll,
+  translateNodes,
   sendBackward,
   type ActiveTool,
   type NudgeDir,
@@ -14,7 +17,7 @@ import { isEditable } from './editable'
 import { useEditorStore } from './use-editor'
 
 // Tool letters from the spec's keyboard table.
-const TOOL_KEYS: Record<string, ActiveTool> = { v: 'select', p: 'pen', l: 'line', r: 'rect', e: 'ellipse' }
+const TOOL_KEYS: Record<string, ActiveTool> = { v: 'select', a: 'node', p: 'pen', l: 'line', r: 'rect', e: 'ellipse' }
 const ARROWS: Record<string, NudgeDir> = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' }
 
 // App-wide shortcuts. Grid (G), view (0, 1) and Space pan stay in use-viewport-input.
@@ -65,7 +68,13 @@ export function useShortcuts(): void {
           return
         }
         if (e.key === 'Delete' || e.key === 'Backspace') {
-          const { selection } = store.getState()
+          const { selection, ui } = store.getState()
+          // Node tool with nodes selected: delete the nodes. Otherwise delete the selected shapes.
+          if (ui.activeTool === 'node' && selection.nodes.length > 0) {
+            e.preventDefault()
+            store.dispatch(deleteSelectedNodes(selection))
+            return
+          }
           if (selection.shapeIds.length === 0) return
           e.preventDefault()
           store.dispatch(deleteSelection(selection))
@@ -81,6 +90,14 @@ export function useShortcuts(): void {
         const dir = ARROWS[e.key]
         if (dir) {
           const { selection, ui } = store.getState()
+          if (ui.activeTool === 'node' && selection.nodes.length > 0) {
+            // Node tool: nudge the selected nodes. Same step as shape nudging (snap increment, Shift = 1).
+            e.preventDefault()
+            const step = nudgeAmount(ui.snapIncrement, e.shiftKey)
+            const [ux, uy] = dir === 'left' ? [-1, 0] : dir === 'right' ? [1, 0] : dir === 'up' ? [0, -1] : [0, 1]
+            store.dispatch(translateNodes(selection, ux * step, uy * step))
+            return
+          }
           if (selection.shapeIds.length === 0) return
           e.preventDefault() // no page scroll
           store.dispatch(nudgeSelection(selection, dir, ui.snapIncrement, e.shiftKey))

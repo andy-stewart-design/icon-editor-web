@@ -6,6 +6,7 @@ import { useViewportInput } from '../../hooks/use-viewport-input'
 import ContentLayer from './content-layer'
 import GridLayer from './grid-layer'
 import KeylineLayer from './keyline-layer'
+import NodeOverlay from './node-overlay'
 import SelectionOverlay from './selection-overlay'
 import ToolOverlay from './tool-overlay'
 import s from './styles.module.css'
@@ -54,6 +55,7 @@ export default function Canvas() {
           <KeylineLayer />
           <ContentLayer />
           <SelectionOverlay />
+          <NodeOverlay />
           <ToolOverlay primitives={tools.primitives} />
         </>
       )}
