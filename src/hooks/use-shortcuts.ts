@@ -20,6 +20,11 @@ import { useEditorStore } from './use-editor'
 const TOOL_KEYS: Record<string, ActiveTool> = { v: 'select', a: 'node', p: 'pen', l: 'line', r: 'rect', e: 'ellipse' }
 const ARROWS: Record<string, NudgeDir> = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' }
 
+// Elements where Enter already means activate. Enter is left alone there so the browser can click them.
+const ACTIVATABLE_TAGS = new Set(['BUTTON', 'A', 'SELECT'])
+const isActivatable = (target: EventTarget | null): boolean =>
+  target instanceof HTMLElement && ACTIVATABLE_TAGS.has(target.tagName)
+
 // App-wide shortcuts. Grid (G), view (0, 1) and Space pan stay in use-viewport-input.
 // Ignored while focus is in a text field or choice. Tool keys and the backtick are also ignored with Cmd, Ctrl or Alt held.
 // Undo and redo take Cmd or Ctrl (Shift for redo); Alt is not part of either.
@@ -65,6 +70,20 @@ export function useShortcuts(): void {
           e.preventDefault()
           if (e.repeat) return
           store.setUi({ snapEnabled: !store.getState().ui.snapEnabled })
+          return
+        }
+        if (e.key === 'Enter') {
+          // Figma-style Enter toggle: a selected shape opens the Node tool, and Enter in the Node tool returns to Select.
+          // Buttons, links and selects keep Enter for activation, so focused toolbar buttons still work.
+          const { selection, ui } = store.getState()
+          if (e.shiftKey || isActivatable(e.target)) return
+          if (ui.activeTool === 'node') {
+            e.preventDefault()
+            store.setUi({ activeTool: 'select' })
+          } else if (ui.activeTool === 'select' && selection.shapeIds.length > 0) {
+            e.preventDefault()
+            store.setUi({ activeTool: 'node' })
+          }
           return
         }
         if (e.key === 'Delete' || e.key === 'Backspace') {
