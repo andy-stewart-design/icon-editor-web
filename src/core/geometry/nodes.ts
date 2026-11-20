@@ -123,6 +123,60 @@ export function deleteNodes(shape: PathShape, nodeIds: ReadonlySet<string>): Pat
   return { ...shape, subpaths }
 }
 
+// Removes the nodes in nodeIds and leaves the path open where they were (the default Delete). Each subpath that
+// loses a node is cut into runs of surviving nodes, and each run of two or more nodes becomes an open subpath:
+// - Closed subpath: the runs follow the order after the removed nodes, so the old neighbours become the two ends.
+//   One removed node gives one open piece. Several removed runs give several pieces.
+// - Open subpath: runs are the stretches between removed nodes, so an interior removal splits it in two.
+// The first piece of a subpath keeps its id, later pieces get new ids. Ends drop the handle that pointed off the
+// path (first node hIn, last node hOut), because a dangling handle on an open end would still show and bend nothing.
+// Other handles are kept. Pieces under two nodes are dropped. Returns null when no subpath survives, and the same
+// shape when nothing matches. Does not mutate its input.
+export function breakAtNodes(shape: PathShape, nodeIds: ReadonlySet<string>): PathShape | null {
+  const touched = shape.subpaths.some((sp) => sp.nodes.some((n) => nodeIds.has(n.id)))
+  if (!touched) return shape
+  const subpaths: Subpath[] = []
+  for (const sp of shape.subpaths) {
+    if (!sp.nodes.some((n) => nodeIds.has(n.id))) {
+      subpaths.push(sp)
+      continue
+    }
+    let keptId = false
+    for (const run of survivingRuns(sp, nodeIds)) {
+      if (run.length < 2) continue
+      const nodes = run.map((n) => ({ ...n }))
+      delete nodes[0].hIn
+      delete nodes[nodes.length - 1].hOut
+      // The first piece that survives takes the original id, so a dropped run never takes it.
+      subpaths.push({ id: keptId ? newId() : sp.id, closed: false, nodes })
+      keptId = true
+    }
+  }
+  if (subpaths.length === 0) return null
+  return { ...shape, subpaths }
+}
+
+// Maximal runs of surviving nodes, in path order. A closed subpath is scanned starting just after a removed node,
+// so a run that crosses the array's end is not split and the first run comes right after the removal.
+function survivingRuns(sp: Subpath, nodeIds: ReadonlySet<string>): PathNode[][] {
+  const n = sp.nodes.length
+  const runs: PathNode[][] = []
+  let cur: PathNode[] = []
+  // Open subpaths start at index 0. Closed ones start at the first removed node, so the scan ends just before it.
+  const start = sp.closed ? sp.nodes.findIndex((node) => nodeIds.has(node.id)) : 0
+  for (let k = 0; k < n; k++) {
+    const node = sp.nodes[(start + k) % n]
+    if (nodeIds.has(node.id)) {
+      if (cur.length > 0) runs.push(cur)
+      cur = []
+    } else {
+      cur.push(node)
+    }
+  }
+  if (cur.length > 0) runs.push(cur)
+  return runs
+}
+
 // Moves one handle to pt and applies the node's mode to the opposite handle.
 // corner: only the dragged handle moves.
 // smooth: the opposite handle points the other way, keeps its own length. Left absent if absent or zero-length.

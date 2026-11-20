@@ -3,7 +3,7 @@ import { newId } from '../ids'
 import type { NodeRef } from '../history'
 import { createDefaultDoc, type IconDoc, type PathNode, type PathShape, type Pt } from '../model'
 import { createEditorStore } from '../store'
-import { nodePanelState, setNodePosition, setSelectedNodesMode } from './nodes'
+import { deleteSelectedNodes, nodePanelState, setNodePosition, setSelectedNodesMode } from './nodes'
 
 const n = (p: Pt, extra: Partial<PathNode> = {}): PathNode => ({ id: newId(), p, mode: 'corner', ...extra })
 const shape = (nodes: PathNode[], closed = false): PathShape => ({
@@ -133,5 +133,39 @@ describe('node panel state', () => {
     expect(nodePanelState(doc, sel(sym))?.mode).toBe('symmetric')
     expect(nodePanelState(doc, sel(straight, free))).toEqual({ count: 2, x: 'mixed', y: 1, mode: 'mixed' })
     expect(nodePanelState(doc, sel(straight, zeroHandle))).toEqual({ count: 2, x: 'mixed', y: 1, mode: 'straight' })
+  })
+})
+
+describe('deleteSelectedNodes (AC22, R13)', () => {
+  const closed4 = (): PathShape => shape([n({ x: 0, y: 0 }), n({ x: 10, y: 0 }), n({ x: 10, y: 10 }), n({ x: 0, y: 10 })], true)
+
+  it("'break' leaves the path open; one history entry; one undo restores the doc exactly", () => {
+    const s = closed4()
+    const store = createEditorStore(docWith([s]))
+    const before = JSON.stringify(store.getState().doc)
+    const sp = s.subpaths[0]
+    store.setSelection({ shapeIds: [s.id], nodes: [{ shapeId: s.id, subpathId: sp.id, nodeId: sp.nodes[1].id }] })
+
+    store.dispatch(deleteSelectedNodes(store.getState().selection, 'break'))
+    const after = store.getState().doc.shapes[0].subpaths
+    expect(after).toHaveLength(1)
+    expect(after[0].closed).toBe(false)
+    expect(after[0].nodes).toHaveLength(3)
+    expect(store.getState().history.past).toHaveLength(1)
+
+    store.undo()
+    expect(JSON.stringify(store.getState().doc)).toBe(before)
+    expect(store.getState().history.past).toHaveLength(0)
+  })
+
+  it("'join' keeps the path closed (Shift+Delete behaviour)", () => {
+    const s = closed4()
+    const store = createEditorStore(docWith([s]))
+    const sp = s.subpaths[0]
+    store.setSelection({ shapeIds: [s.id], nodes: [{ shapeId: s.id, subpathId: sp.id, nodeId: sp.nodes[1].id }] })
+    store.dispatch(deleteSelectedNodes(store.getState().selection, 'join'))
+    const out = store.getState().doc.shapes[0].subpaths[0]
+    expect(out.closed).toBe(true)
+    expect(out.nodes).toHaveLength(3)
   })
 })

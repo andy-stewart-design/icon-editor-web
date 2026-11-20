@@ -111,13 +111,21 @@ const BINDINGS: readonly Binding[] = [
       if (selection.shapeIds.length > 0) store.dispatch(duplicateSelection(doc, selection))
     },
   },
-  // Delete. In the Node tool with nodes selected this removes nodes; otherwise it removes the selected shapes.
+  // Delete. In the Node tool with nodes selected, Delete breaks the path at those nodes (left open) and Shift+Delete
+  // joins the neighbours across them. Otherwise both remove the selected shapes.
   {
     keys: ['delete', 'backspace'],
-    shift: 'any',
+    shift: 'none',
     when: nodeContext,
     repeat: true,
-    run: (store) => store.dispatch(deleteSelectedNodes(store.getState().selection)),
+    run: (store) => store.dispatch(deleteSelectedNodes(store.getState().selection, 'break')),
+  },
+  {
+    keys: ['delete', 'backspace'],
+    shift: 'required',
+    when: nodeContext,
+    repeat: true,
+    run: (store) => store.dispatch(deleteSelectedNodes(store.getState().selection, 'join')),
   },
   {
     keys: ['delete', 'backspace'],

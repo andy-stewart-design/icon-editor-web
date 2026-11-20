@@ -1,5 +1,6 @@
 import type { Command, Recipe } from '../commands'
 import {
+  breakAtNodes,
   deleteNodes,
   insertNodeAt,
   moveAnchor,
@@ -187,16 +188,20 @@ export function insertNode(
   }
 }
 
-// Deletes the selected nodes. Neighbours reconnect (see deleteNodes). A subpath under two nodes is removed, and a
-// shape with no subpaths left is removed from the doc. Removed shapes drop out of selection.shapeIds through
-// dispatch's pruning, and selection.nodes is cleared.
-export function deleteSelectedNodes(sel: Selection): Command {
+// Deletes the selected nodes in one of two ways. 'break' (plain Delete) leaves the path open where the nodes were
+// (see breakAtNodes). 'join' (Shift+Delete) reconnects the neighbours (see deleteNodes). A subpath with fewer than
+// two nodes left is removed, and a shape with no subpaths left is removed from the doc. Removed shapes drop out of
+// selection.shapeIds through dispatch's pruning, and selection.nodes is cleared.
+export type DeleteNodesMode = 'break' | 'join'
+
+export function deleteSelectedNodes(sel: Selection, mode: DeleteNodesMode): Command {
   const byShape = new Map<string, Set<string>>()
   for (const r of sel.nodes) {
     const set = byShape.get(r.shapeId) ?? new Set<string>()
     set.add(r.nodeId)
     byShape.set(r.shapeId, set)
   }
+  const apply = mode === 'break' ? breakAtNodes : deleteNodes
   return {
     label: 'Delete nodes',
     recipe: (d) => {
@@ -209,7 +214,7 @@ export function deleteSelectedNodes(sel: Selection): Command {
           continue
         }
         const before = plainShape(shape)
-        const after = deleteNodes(before, ids)
+        const after = apply(before, ids)
         if (after === before) {
           next.push(shape)
           continue

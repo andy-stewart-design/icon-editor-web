@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { PathNode, PathShape, Pt, Subpath } from '../model'
 import { sampleSegment, segmentsOf, toBezier } from './segments'
 import {
+  breakAtNodes,
   deleteNodes,
   enforceNodeModes,
   insertNodeAt,
@@ -282,6 +283,116 @@ describe('deleteNodes', () => {
     const s = open3()
     const snapshot = JSON.stringify(s)
     deleteNodes(s, new Set(['b']))
+    expect(JSON.stringify(s)).toBe(snapshot)
+  })
+})
+
+describe('breakAtNodes', () => {
+  const closed4 = (): PathShape =>
+    shapeOf([
+      {
+        id: 'sp',
+        closed: true,
+        nodes: [
+          node('a', { x: 0, y: 0 }, { hOut: { x: 1, y: 0 } }),
+          node('b', { x: 10, y: 0 }, { hIn: { x: 9, y: 0 }, hOut: { x: 11, y: 0 } }),
+          node('c', { x: 10, y: 10 }, { hIn: { x: 11, y: 10 }, hOut: { x: 9, y: 10 } }),
+          node('d', { x: 0, y: 10 }, { hIn: { x: 1, y: 10 }, hOut: { x: 0, y: 9 } }),
+        ],
+      },
+    ])
+  const open5 = (): PathShape =>
+    shapeOf([
+      {
+        id: 'sp',
+        closed: false,
+        nodes: ['a', 'b', 'c', 'd', 'e'].map((id, i) =>
+          node(id, { x: i * 10, y: 0 }, { hIn: { x: i * 10 - 1, y: 1 }, hOut: { x: i * 10 + 1, y: 1 } }),
+        ),
+      },
+    ])
+  const ids = (sp: Subpath) => sp.nodes.map((n) => n.id)
+
+  it('closed 4-node subpath, one node removed: one open 3-node subpath in order after the removal', () => {
+    const out = breakAtNodes(closed4(), new Set(['a']))!
+    expect(out.subpaths).toHaveLength(1)
+    expect(out.subpaths[0].closed).toBe(false)
+    expect(out.subpaths[0].id).toBe('sp')
+    expect(ids(out.subpaths[0])).toEqual(['b', 'c', 'd'])
+  })
+
+  it('closed subpath: the new ends drop their outward handle and keep the other one', () => {
+    const [first, , last] = breakAtNodes(closed4(), new Set(['a']))!.subpaths[0].nodes
+    expect(first.hIn).toBeUndefined()
+    expect(first.hOut).toEqual({ x: 11, y: 0 })
+    expect(last.hOut).toBeUndefined()
+    expect(last.hIn).toEqual({ x: 1, y: 10 })
+  })
+
+  it('open 5-node path, interior node removed: two open subpaths of 2 and 2 nodes', () => {
+    const out = breakAtNodes(open5(), new Set(['c']))!
+    expect(out.subpaths.map(ids)).toEqual([
+      ['a', 'b'],
+      ['d', 'e'],
+    ])
+    expect(out.subpaths.every((sp) => !sp.closed)).toBe(true)
+    expect(out.subpaths[0].id).toBe('sp')
+    expect(out.subpaths[1].id).not.toBe('sp')
+    const [a, b] = out.subpaths[0].nodes
+    expect(a.hIn).toBeUndefined()
+    expect(b.hOut).toBeUndefined()
+    expect(b.hIn).toEqual({ x: 9, y: 1 })
+    const [d, e] = out.subpaths[1].nodes
+    expect(d.hIn).toBeUndefined()
+    expect(d.hOut).toEqual({ x: 31, y: 1 })
+    expect(e.hOut).toBeUndefined()
+  })
+
+  it('removing an open end node just shortens the path', () => {
+    const out = breakAtNodes(open5(), new Set(['a']))!
+    expect(out.subpaths).toHaveLength(1)
+    expect(ids(out.subpaths[0])).toEqual(['b', 'c', 'd', 'e'])
+    expect(out.subpaths[0].nodes[0].hIn).toBeUndefined()
+  })
+
+  it('only single-node pieces left: the subpath is gone, so the result is null', () => {
+    expect(breakAtNodes(open5(), new Set(['b', 'd']))).toBeNull()
+  })
+
+  it('a piece under two nodes is dropped while the other survives', () => {
+    const out = breakAtNodes(open5(), new Set(['b']))!
+    expect(out.subpaths.map(ids)).toEqual([['c', 'd', 'e']])
+    expect(out.subpaths[0].id).toBe('sp')
+  })
+
+  it('two removed nodes in a closed subpath give two open pieces', () => {
+    const closed6 = shapeOf([
+      {
+        id: 'sp',
+        closed: true,
+        nodes: ['a', 'b', 'c', 'd', 'e', 'f'].map((id, i) => node(id, { x: i, y: 0 })),
+      },
+    ])
+    const out = breakAtNodes(closed6, new Set(['b', 'e']))!
+    expect(out.subpaths.map((sp) => sp.closed)).toEqual([false, false])
+    expect(out.subpaths.map(ids)).toEqual([
+      ['c', 'd'],
+      ['f', 'a'],
+    ])
+    expect(out.subpaths[0].id).toBe('sp')
+    expect(out.subpaths[1].id).not.toBe('sp')
+  })
+
+  it('removing every node returns null; nothing matching returns the same shape', () => {
+    expect(breakAtNodes(closed4(), new Set(['a', 'b', 'c', 'd']))).toBeNull()
+    const s = closed4()
+    expect(breakAtNodes(s, new Set(['zzz']))).toBe(s)
+  })
+
+  it('does not mutate its input', () => {
+    const s = closed4()
+    const snapshot = JSON.stringify(s)
+    breakAtNodes(s, new Set(['a']))
     expect(JSON.stringify(s)).toBe(snapshot)
   })
 })

@@ -214,7 +214,7 @@ describe('node deletion (AC22)', () => {
     const store = createEditorStore(docWith([s]))
     store.setSelection({ shapeIds: [s.id], nodes: [refOf(s, a), refOf(s, b)] })
 
-    store.dispatch(deleteSelectedNodes(store.getState().selection))
+    store.dispatch(deleteSelectedNodes(store.getState().selection, 'break'))
     expect(store.getState().doc.shapes).toHaveLength(0)
     expect(store.getState().selection.shapeIds).toEqual([])
     expect(store.getState().history.past).toHaveLength(1)
