@@ -241,9 +241,13 @@ export function useToolInput(): ToolInput {
             bump()
             return
           }
+          // Esc during a press only cancels that drag. With no press, Esc in the Node tool leaves it for Select: the
+          // tool first clears its node selection, so re-entering Node mode doesn't bring old nodes back.
+          const pressed = gestureRef.current !== null
           clearGesture(gestureRef.current)
           gestureRef.current = null
           tool.keyDown('Escape')
+          if (!pressed && store.getState().ui.activeTool === 'node') store.setUi({ activeTool: 'select' })
           bump()
           return
         }
