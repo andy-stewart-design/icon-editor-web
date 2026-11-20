@@ -7,8 +7,9 @@ const ANCHOR_HALF = 3 // half the side of an anchor square, screen px
 const HANDLE_DOT_RADIUS = 3 // screen px
 
 // Static node display for the Node tool: every anchor of the selected shapes (selected ones filled) and the handles of
-// the selected nodes. Drawn in screen pixels at constant size, from the live doc each render. Only shown for the Node
-// tool. Never serialized; the tool overlay draws hover feedback on top.
+// the selected nodes. The segment outlines come from SelectionOutline, which is drawn below this layer. Drawn in screen
+// pixels at constant size, from the live doc each render. Only shown for the Node tool. Never serialized; the tool
+// overlay draws hover feedback on top.
 export default function NodeOverlay() {
   const active = useEditor((e) => e.ui.activeTool === 'node')
   const doc = useEditor((e) => e.doc)
@@ -43,7 +44,7 @@ export default function NodeOverlay() {
             </g>
           )
         }
-        return null
+        return null // segment outlines are drawn by SelectionOutline
       })}
     </svg>
   )

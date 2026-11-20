@@ -26,6 +26,7 @@ export type OverlayPrimitive =
   | { kind: 'anchor'; p: Pt; selected?: boolean } // a node, drawn at a constant screen size; Node tool: selected = highlighted
   | { kind: 'handle'; from: Pt; to: Pt } // a node's handle: a line from the anchor and a dot at the handle
   | { kind: 'nodeHover'; p: Pt } // Node tool: ring on the anchor or handle under the pointer (no gesture active)
+  | { kind: 'segmentOutline'; from: Pt; c1: Pt; c2: Pt; to: Pt } // Node tool: every segment of the selected shapes, as a cubic, drawn as a neutral centerline
   | { kind: 'segmentHover'; from: Pt; c1: Pt; c2: Pt; to: Pt } // Node tool: the segment under the pointer, as a cubic (c1 = from and c2 = to when straight)
   | { kind: 'closeTarget'; p: Pt } // Pen tool: ring on the first node while a click would close the path
 

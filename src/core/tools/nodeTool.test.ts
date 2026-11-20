@@ -5,7 +5,7 @@ import { newId } from '../ids'
 import type { NodeRef, Selection } from '../history'
 import { createDefaultDoc, type IconDoc, type PathNode, type PathShape, type Pt } from '../model'
 import { createEditorStore } from '../store'
-import { createNodeTool, hitNode, nodeOverlay } from './nodeTool'
+import { createNodeTool, hitNode, nodeOverlay, selectionOutline } from './nodeTool'
 import type { ToolEvent } from './types'
 
 const ZOOM = 16
@@ -240,6 +240,26 @@ describe('node tool hit testing and overlay', () => {
     const overlay = nodeOverlay(doc, { ...sel, nodes: [refOf(s, b)] })
     expect(overlay.filter((p) => p.kind === 'anchor')).toHaveLength(2)
     expect(overlay.filter((p) => p.kind === 'handle')).toEqual([{ kind: 'handle', from: { x: 12, y: 12 }, to: { x: 16, y: 12 } }])
+  })
+
+  it('emits one segment outline per segment of selected shapes, closing segment included, and none for unselected shapes', () => {
+    const open = shape([n({ x: 0, y: 0 }), n({ x: 10, y: 0 }), n({ x: 10, y: 10 })])
+    const closed = shape([n({ x: 0, y: 0 }), n({ x: 10, y: 0 }), n({ x: 10, y: 10 }), n({ x: 0, y: 10 })], true)
+    const other = shape([n({ x: 50, y: 50 }), n({ x: 60, y: 50 })])
+    const doc = docWith([open, closed, other])
+    const outlines = (ids: string[]) => nodeOverlay(doc, { shapeIds: ids, nodes: [] }).filter((p) => p.kind === 'segmentOutline')
+    expect(outlines([open.id])).toHaveLength(2)
+    expect(outlines([closed.id])).toHaveLength(4)
+    expect(outlines([other.id, open.id])).toHaveLength(3)
+    expect(outlines([])).toHaveLength(0)
+  })
+
+  it('selectionOutline returns only the segment outlines that nodeOverlay starts with', () => {
+    const open = shape([n({ x: 0, y: 0 }), n({ x: 10, y: 0 }), n({ x: 10, y: 10 })])
+    const doc = docWith([open])
+    const sel = { shapeIds: [open.id], nodes: [] }
+    expect(selectionOutline(doc, sel)).toHaveLength(2)
+    expect(nodeOverlay(doc, sel).slice(0, 2)).toEqual(selectionOutline(doc, sel))
   })
 })
 

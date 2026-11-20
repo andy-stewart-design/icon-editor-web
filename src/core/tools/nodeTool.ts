@@ -7,7 +7,7 @@ import {
 import type { Recipe } from '../commands'
 import type { Rect } from '../geometry/bounds'
 import { nearestSegment } from '../geometry/nodes'
-import { segmentBetween } from '../geometry/segments'
+import { segmentBetween, segmentsOf } from '../geometry/segments'
 import type { NodeRef, Selection } from '../history'
 import type { IconDoc, PathShape, Pt } from '../model'
 import type { EditorState } from '../store'
@@ -124,10 +124,24 @@ function rectBetween(a: Pt, b: Pt): Rect {
   return { x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), w: Math.abs(b.x - a.x), h: Math.abs(b.y - a.y) }
 }
 
-// Static node display for the canvas, drawn at constant screen size by the UI. It covers every anchor of the selected
-// shapes (selected nodes flagged) and the non-zero handles of the selected nodes, as handle lines.
-export function nodeOverlay(doc: IconDoc, sel: Selection): OverlayPrimitive[] {
+// Neutral outline of every segment of the selected shapes. The Select tool draws it too, so it lives apart from the node
+// display. Segments come from segmentsOf, the same source nearestSegment uses for hit testing, so outlines match hit targets.
+export function selectionOutline(doc: IconDoc, sel: Selection): OverlayPrimitive[] {
   const out: OverlayPrimitive[] = []
+  for (const shape of doc.shapes) {
+    if (!sel.shapeIds.includes(shape.id)) continue
+    for (const sp of shape.subpaths) {
+      for (const seg of segmentsOf(sp)) out.push({ kind: 'segmentOutline', from: seg.from.p, c1: seg.c1, c2: seg.c2, to: seg.to.p })
+    }
+  }
+  return out
+}
+
+// Static node display for the canvas, drawn at constant screen size by the UI. It starts with the segment outlines of the
+// selected shapes, then every anchor of the selected shapes (selected nodes flagged) and the non-zero handles of the
+// selected nodes, as handle lines. Outlines come first so anchors and handles draw over them.
+export function nodeOverlay(doc: IconDoc, sel: Selection): OverlayPrimitive[] {
+  const out: OverlayPrimitive[] = [...selectionOutline(doc, sel)]
   const selected = new Set(sel.nodes.map(keyOf))
   for (const shape of doc.shapes) {
     if (!sel.shapeIds.includes(shape.id)) continue
