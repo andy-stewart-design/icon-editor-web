@@ -48,11 +48,11 @@ Expected files:
 
 Tasks:
 
-- [ ] Before editing, run `pnpm test src/core/tools/penTool.test.ts src/core/tools/nodeTool.test.ts src/core/serialize/index.test.ts src/core/history.test.ts` and record the baseline in this step’s evidence.
-- [ ] Resolve only the ends of open subpaths in the eligible shape, from raw pointer coordinates and the existing screen-space hit tolerance. Choose a stable winner for overlapping targets so hover and press can use the same result. Do not reuse Node Select’s segment insertion hit behavior.
-- [ ] Assemble tail extensions by appending and head extensions by prepending the new nodes in reverse placement order with their handle roles swapped. Leave the old nodes and segment direction intact. Closing uses the original opposite endpoint without adding a duplicate or rewriting a handle on an existing segment.
-- [ ] Add cases for closed and interior exclusion, overlap and zoom tolerance, curved extensions in both directions, and closure with original segments unchanged.
-- [ ] Satisfy the verification and completion gate below, and record concise evidence.
+- [x] Before editing, run `pnpm test src/core/tools/penTool.test.ts src/core/tools/nodeTool.test.ts src/core/serialize/index.test.ts src/core/history.test.ts` and record the baseline in this step’s evidence.
+- [x] Resolve only the ends of open subpaths in the eligible shape, from raw pointer coordinates and the existing screen-space hit tolerance. Choose a stable winner for overlapping targets so hover and press can use the same result. Do not reuse Node Select’s segment insertion hit behavior.
+- [x] Assemble tail extensions by appending and head extensions by prepending the new nodes in reverse placement order with their handle roles swapped. Leave the old nodes and segment direction intact. Closing uses the original opposite endpoint without adding a duplicate or rewriting a handle on an existing segment.
+- [x] Add cases for closed and interior exclusion, overlap and zoom tolerance, curved extensions in both directions, and closure with original segments unchanged.
+- [x] Satisfy the verification and completion gate below, and record concise evidence.
 
 Verification:
 
