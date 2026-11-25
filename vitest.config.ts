@@ -1,7 +1,7 @@
 import { defineConfig } from 'vitest/config'
 
-// Tests cover pure core logic only (src/core), so they run in plain node.
-// UI is verified manually; there is no DOM test environment.
+// Tests run in plain Node, without a DOM test environment.
+// Rendered UI is verified manually.
 export default defineConfig({
   test: {
     environment: 'node',

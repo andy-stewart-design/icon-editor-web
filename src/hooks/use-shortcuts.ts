@@ -14,6 +14,7 @@ import {
   selectAll,
   sendBackward,
   translateNodes,
+  zoomAt,
   type ActiveTool,
   type EditorState,
   type EditorStore,
@@ -73,6 +74,18 @@ const flip = (axis: 'h' | 'v'): Binding => ({
   repeat: false,
   run: (store) => store.dispatch(flipSelection(store.getState().selection, axis)),
 })
+
+const ZOOM_STEP = 1.25
+
+const zoomCanvas =
+  (factor: number): Binding['run'] =>
+  (store) => {
+    const { viewport, canvasSize } = store.getState().ui
+    const center = { x: canvasSize.width / 2, y: canvasSize.height / 2 }
+    store.setUi({ viewport: zoomAt(viewport, viewport.zoom * factor, center) })
+  }
+
+const zoomIn = zoomCanvas(ZOOM_STEP)
 
 const BINDINGS: readonly Binding[] = [
   // Tools. Shift+V is flip when shapes are selected; without a selection it does nothing, as before.
@@ -180,6 +193,11 @@ const BINDINGS: readonly Binding[] = [
   { keys: ['arrowup'], shift: 'any', when: hasShapes, repeat: true, run: nudge('up', false) },
   { keys: ['arrowdown'], shift: 'any', when: hasShapes, repeat: true, run: nudge('down', false) },
 
+  // '+' can be shifted (main keyboard) or unshifted (e.g. keypad).
+  { keys: ['+'], cmd: true, shift: 'any', run: zoomIn },
+  { keys: ['='], cmd: true, run: zoomIn },
+  { keys: ['-'], cmd: true, run: zoomCanvas(1 / ZOOM_STEP) },
+
   // View. Toggling these on hold would flicker, so they ignore repeat.
   {
     keys: ['g'],
@@ -211,7 +229,11 @@ const BINDINGS: readonly Binding[] = [
 ]
 
 // The one keydown dispatcher. Returns after the first binding that matches, so table order is the priority.
-function dispatchKey(store: EditorStore, e: KeyboardEvent, segmentDeletes: Set<string>): void {
+export function dispatchKey(
+  store: EditorStore,
+  e: KeyboardEvent,
+  segmentDeletes: Set<string>,
+): void {
   const key = e.key.toLowerCase()
   if (!e.repeat) segmentDeletes.delete(key)
 
