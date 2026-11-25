@@ -1,6 +1,8 @@
 import type { Command } from '../commands'
+import { selectionBounds } from '../geometry/bounds'
+import { translate } from '../geometry/transform'
 import type { Selection } from '../history'
-import type { IconDoc, PathNode, PathShape } from '../model'
+import type { IconDoc, PathNode, PathShape, Pt } from '../model'
 import { cloneWithNewIds, deleteSelection } from './arrange'
 import { deleteSelectedNodes, selectedNodes } from './nodes'
 
@@ -77,6 +79,7 @@ export function pasteClipboard(
   sel: Selection,
   nodeSelect: boolean,
   payload: Clipboard,
+  center: Pt | undefined,
 ): Command | undefined {
   const selectionAfter: Selection = { shapeIds: [], nodes: [] }
   const loose: PathNode[] = []
@@ -88,8 +91,16 @@ export function pasteClipboard(
   if (hasLoose && new Set(anchors.map(({ node }) => node)).size !== 1) return
   const anchor = anchors[0]
 
+  // Include loose points in the same bounds before splitting them into their destination.
+  const bounds = center && selectionBounds(payload.shapes)
+  const offset = center &&
+    bounds && {
+      x: center.x - (bounds.x + bounds.w / 2),
+      y: center.y - (bounds.y + bounds.h / 2),
+    }
   for (const source of payload.shapes) {
-    const shape = cloneWithNewIds(source)
+    const clone = cloneWithNewIds(source)
+    const shape = offset ? translate(clone, offset.x, offset.y) : clone
     if (points) {
       shape.subpaths = shape.subpaths.filter((sp) => {
         if (sp.nodes.length === 1) {

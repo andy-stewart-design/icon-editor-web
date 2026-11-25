@@ -12,7 +12,7 @@ import { captureClipboard, pasteClipboard, type Clipboard } from './commands/cli
 import type { ResizeMode } from './commands/document'
 import type { IconDoc } from './model'
 import type { LoadResult, SaveStatus } from './persistence'
-import type { Size, Viewport } from './viewport'
+import { screenToDoc, type Size, type Viewport } from './viewport'
 
 export type ActiveTool = 'select' | 'pen' | 'line' | 'rect' | 'ellipse'
 export type EditMode = 'shape' | 'node'
@@ -168,7 +168,13 @@ export function createEditorStore(initialDoc: IconDoc): EditorStore {
       if (action === 'paste') {
         if (!clipboard) return
         const payload = clipboard
-        const command = pasteClipboard(doc, selection, nodeSelect, payload)
+        const { width, height } = ui.canvasSize
+        // Keep the original placement until the canvas has a visible area.
+        const center =
+          width > 0 && height > 0
+            ? screenToDoc(ui.viewport, { x: width / 2, y: height / 2 })
+            : undefined
+        const command = pasteClipboard(doc, selection, nodeSelect, payload, center)
         if (!command) return
         commands.dispatch(command)
         if (payload.kind === 'points' && !nodeSelect) setUi({ activeTool: 'select', mode: 'node' })
