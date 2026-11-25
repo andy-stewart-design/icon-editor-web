@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState, type PointerEvent as ReactPointerEvent, type MouseEvent as ReactMouseEvent } from 'react'
 import {
   buildSnapFn,
   createEllipseTool,
@@ -29,6 +29,7 @@ type Gesture = { id: number; local: Pt; el: HTMLDivElement }
 
 export type ToolInput = {
   handlers: {
+    onDoubleClick: (e: ReactMouseEvent<HTMLDivElement>) => void
     onPointerDown: (e: ReactPointerEvent<HTMLDivElement>) => void
     onPointerMove: (e: ReactPointerEvent<HTMLDivElement>) => void
     onPointerLeave: (e: ReactPointerEvent<HTMLDivElement>) => void
@@ -186,12 +187,20 @@ export function useToolInput(): ToolInput {
 
   const handlers = useMemo<ToolInput['handlers']>(() => {
     // Canvas-local position of a pointer event, in CSS px.
-    const localOf = (e: ReactPointerEvent<HTMLDivElement>): Pt => {
+    const localOf = (e: ReactMouseEvent<HTMLDivElement>): Pt => {
       const r = e.currentTarget.getBoundingClientRect()
       return { x: e.clientX - r.left, y: e.clientY - r.top }
     }
 
     return {
+      onDoubleClick(e) {
+        const { ui, tx } = store.getState()
+        if (e.button !== 0 || gestureRef.current || tx || !isNodeSelect(ui) || e.currentTarget.dataset.pan) return
+        const tool = toolRef.current
+        if (!tool?.doubleClick || !ui.canvasSize.width || !ui.canvasSize.height) return
+        tool.doubleClick(toolEvent(store, localOf(e), e, spaceRef.current))
+        bump()
+      },
       onPointerDown(e) {
         const tool = toolRef.current
         if (!tool || e.button !== 0 || gestureRef.current) return
@@ -227,8 +236,11 @@ export function useToolInput(): ToolInput {
       },
       onPointerLeave() {
         hoverRef.current = null
-        if (gestureRef.current || store.getState().ui.activeTool !== 'pen') return
-        toolRef.current?.pointerCancel()
+        if (gestureRef.current) return
+        const { ui } = store.getState()
+        if (isNodeSelect(ui)) toolRef.current?.deactivate?.() // clear hover, not the static selection
+        else if (ui.activeTool === 'pen') toolRef.current?.pointerCancel()
+        else return
         bump()
       },
       onPointerUp(e) {

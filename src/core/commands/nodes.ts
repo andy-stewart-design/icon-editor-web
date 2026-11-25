@@ -1,6 +1,7 @@
 import type { Command, Recipe } from '../commands'
 import {
   breakAtNodes,
+  cutSegmentAt,
   deleteNodes,
   insertNodeAt,
   moveAnchor,
@@ -8,7 +9,7 @@ import {
   retractHandles,
   setNodeMode,
 } from '../geometry/nodes'
-import type { NodeRef, Selection } from '../history'
+import { resolveSegment, withoutSegment, type NodeRef, type Selection } from '../history'
 import type { IconDoc, PathNode, PathShape, Pt, Subpath } from '../model'
 
 // Node commands. Each one is a single history entry. Recipes act on the node refs in the selection; a ref that no
@@ -225,6 +226,25 @@ export function deleteSelectedNodes(sel: Selection, mode: DeleteNodesMode): Comm
       if (changed) d.shapes = next
     },
     selectionAfter: { shapeIds: sel.shapeIds, nodes: [] },
+  }
+}
+
+export function cutSelectedSegment(sel: Selection): Command {
+  const ref = sel.segment
+  return {
+    label: 'Cut segment',
+    recipe: (doc) => {
+      if (!ref || sel.nodes.length || !sel.shapeIds.includes(ref.shapeId)) return
+      const resolved = resolveSegment(doc, ref)
+      if (!resolved) return
+      const i = doc.shapes.findIndex((s) => s.id === ref.shapeId)
+      const { subpaths } = doc.shapes[i]
+      const j = subpaths.findIndex((sp) => sp.id === ref.subpathId)
+      const runs = cutSegmentAt(plainSubpath(resolved.subpath), resolved.segment.index)
+      subpaths.splice(j, 1, ...runs)
+      if (!subpaths.length) doc.shapes.splice(i, 1)
+    },
+    selectionAfter: withoutSegment(sel),
   }
 }
 

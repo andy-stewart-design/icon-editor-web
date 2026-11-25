@@ -2,7 +2,6 @@ import { produce } from 'immer'
 import {
   emptyHistory,
   emptySelection,
-  pruneSelection,
   recordEntry,
   stepBack,
   stepForward,
@@ -23,7 +22,11 @@ type StateApi = {
 // Misuse throws: dispatch or update outside a transaction, begin inside one, and dispatch inside one.
 // Gesture ends are forgiving: commit or cancel with no open transaction is a no-op.
 // undo and redo cancel an open transaction first, so the gesture's pre-drag doc is what gets undone.
-export function createCommands(api: StateApi, notify: (doc: IconDoc) => void) {
+export function createCommands(
+  api: StateApi,
+  notify: (doc: IconDoc) => void,
+  selectionFor: (sel: Selection, doc: IconDoc) => Selection,
+) {
   // Records one entry and notifies, unless the recipe left the doc reference unchanged.
   const record = (entry: HistoryEntry): void => {
     const { history } = api.getState()
@@ -44,7 +47,7 @@ export function createCommands(api: StateApi, notify: (doc: IconDoc) => void) {
     if (tx) throw new Error(`dispatch("${command.label}") during open transaction "${tx.label}"`)
     const after = produce(doc, command.recipe)
     const selectionBefore = selection
-    const selectionAfter = pruneSelection(command.selectionAfter ?? selection, after)
+    const selectionAfter = selectionFor(command.selectionAfter ?? selection, after)
     record({ label: command.label, before: doc, after, selectionBefore, selectionAfter })
   }
 
@@ -75,7 +78,7 @@ export function createCommands(api: StateApi, notify: (doc: IconDoc) => void) {
       before: tx.base,
       after: doc,
       selectionBefore: tx.selectionBefore,
-      selectionAfter: pruneSelection(selectionAfter ?? selection, doc),
+      selectionAfter: selectionFor(selectionAfter ?? selection, doc),
     })
   }
 
@@ -92,7 +95,7 @@ export function createCommands(api: StateApi, notify: (doc: IconDoc) => void) {
     const { entry } = step
     api.setState({
       doc: entry.before,
-      selection: pruneSelection(entry.selectionBefore, entry.before),
+      selection: selectionFor(entry.selectionBefore, entry.before),
       history: step.history,
     })
     notify(entry.before)
@@ -105,7 +108,7 @@ export function createCommands(api: StateApi, notify: (doc: IconDoc) => void) {
     const { entry } = step
     api.setState({
       doc: entry.after,
-      selection: pruneSelection(entry.selectionAfter, entry.after),
+      selection: selectionFor(entry.selectionAfter, entry.after),
       history: step.history,
     })
     notify(entry.after)

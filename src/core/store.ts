@@ -1,6 +1,6 @@
 import { createStore } from 'zustand/vanilla'
 import { createCommands, type Command, type Recipe } from './commands'
-import { emptyHistory, emptySelection, type HistoryState, type Selection } from './history'
+import { emptyHistory, emptySelection, pruneSelection, withoutSegment, type HistoryState, type Selection } from './history'
 import type { ResizeMode } from './commands/document'
 import type { IconDoc } from './model'
 import type { LoadResult, SaveStatus } from './persistence'
@@ -100,12 +100,20 @@ export function createEditorStore(initialDoc: IconDoc): EditorStore {
     tx: null,
   }))
   const listeners = new Set<Listener>()
-  const commands = createCommands(api, (doc) => listeners.forEach((l) => l(doc)))
+  const selectionFor = (sel: Selection, doc: IconDoc) =>
+    pruneSelection(isNodeSelect(api.getState().ui) ? sel : withoutSegment(sel), doc)
+  const commands = createCommands(api, (doc) => listeners.forEach((l) => l(doc)), selectionFor)
   return {
     getState: api.getState,
     subscribe: api.subscribe,
-    setSelection: (selection) => api.setState({ selection }),
-    setUi: (patch) => api.setState({ ui: updateUi(api.getState().ui, patch) }),
+    setSelection: (selection) => {
+      api.setState({ selection: selection.segment ? selectionFor(selection, api.getState().doc) : selection })
+    },
+    setUi: (patch) => {
+      const { ui, selection } = api.getState()
+      const next = updateUi(ui, patch)
+      api.setState({ ui: next, selection: isNodeSelect(next) ? selection : withoutSegment(selection) })
+    },
     ...commands,
     subscribeCommitted: (listener) => {
       listeners.add(listener)

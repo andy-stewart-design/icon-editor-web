@@ -3,6 +3,7 @@ import type { PathNode, PathShape, Pt, Subpath } from '../model'
 import { sampleSegment, segmentsOf, toBezier } from './segments'
 import {
   breakAtNodes,
+  cutSegmentAt,
   deleteNodes,
   enforceNodeModes,
   insertNodeAt,
@@ -563,5 +564,36 @@ describe('setNodeMode (subpath)', () => {
     near(byId(out, 'b').hIn!, { x: -4, y: 0 })
     expect(byId(out, 'a')).toBe(byId(sp, 'a'))
     expect(byId(sp, 'b').mode).toBe('corner')
+  })
+})
+
+describe('cutSegmentAt', () => {
+  const nodes = ['a', 'b', 'c', 'd'].map((id, i) => node(id, { x: 4 * i, y: 4 }, {
+    hIn: { x: 4 * i - 1, y: 5 }, hOut: { x: 4 * i + 1, y: 3 },
+  }))
+  const sp = { id: 'sp', nodes, closed: false }
+  const curves = (s: Subpath) => segmentsOf(s).map((seg) => [seg.from.p, seg.c1, seg.c2, seg.to.p])
+
+  it('splits open runs without changing their Béziers and drops isolated endpoints', () => {
+    const [left, right] = cutSegmentAt(sp, 1)
+    expect(left.id).toBe(sp.id)
+    expect(right.id).not.toBe(sp.id)
+    expect(left.nodes[1].hOut).toBeUndefined()
+    expect(right.nodes[0].hIn).toBeUndefined()
+    expect([...curves(left), ...curves(right)]).toEqual([curves(sp)[0], curves(sp)[2]])
+    expect(cutSegmentAt(sp, 0).map((s) => [s.id, ...s.nodes.map((n) => n.id)])).toEqual([['sp', 'b', 'c', 'd']])
+    expect(cutSegmentAt(sp, 2)[0].nodes.map((n) => n.id)).toEqual(['a', 'b', 'c'])
+    expect(cutSegmentAt({ ...sp, nodes: nodes.slice(0, 2) }, 0)).toEqual([])
+  })
+
+  it('opens a contour at either directed edge of a two-node loop', () => {
+    const loop = { ...sp, nodes: nodes.slice(0, 2), closed: true }
+    for (const i of [0, 1]) {
+      const [opened] = cutSegmentAt(loop, i)
+      expect(opened.closed).toBe(false)
+      expect(opened.id).toBe(loop.id)
+      expect(opened.nodes.map((n) => n.id)).toEqual(i === 0 ? ['b', 'a'] : ['a', 'b'])
+      expect(curves(opened)).toEqual([curves(loop)[1 - i]])
+    }
   })
 })

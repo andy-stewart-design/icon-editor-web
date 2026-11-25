@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import {
   actualSizeViewport,
   bringForward,
+  cutSelectedSegment,
   deleteSelection,
   deleteSelectedNodes,
   duplicateSelection,
@@ -112,6 +113,15 @@ const BINDINGS: readonly Binding[] = [
       if (selection.shapeIds.length > 0) store.dispatch(duplicateSelection(doc, selection))
     },
   },
+  // A selected segment takes priority over deleting its owner.
+  {
+    keys: ['delete', 'backspace'],
+    shift: 'any',
+    when: (s) => isNodeSelect(s.ui) && !!s.selection.segment,
+    run: (store) => {
+      if (!store.getState().tx) store.dispatch(cutSelectedSegment(store.getState().selection))
+    },
+  },
   // Delete. In the Node tool with nodes selected, Delete breaks the path at those nodes (left open) and Shift+Delete
   // joins the neighbours across them. Otherwise both remove the selected shapes.
   {
@@ -195,11 +205,17 @@ const BINDINGS: readonly Binding[] = [
 ]
 
 // The one keydown dispatcher. Returns after the first binding that matches, so table order is the priority.
-function dispatchKey(store: EditorStore, e: KeyboardEvent): void {
+function dispatchKey(store: EditorStore, e: KeyboardEvent, segmentDeletes: Set<string>): void {
+  const key = e.key.toLowerCase()
+  if (!e.repeat) segmentDeletes.delete(key)
+
   // Keys typed into a field belong to the field.
   if (isEditable(e.target) || e.altKey) return
   const cmd = e.metaKey || e.ctrlKey
-  const key = e.key.toLowerCase()
+  if (e.repeat && segmentDeletes.has(key)) {
+    e.preventDefault()
+    return
+  }
   const state = store.getState()
 
   for (const b of BINDINGS) {
@@ -210,6 +226,10 @@ function dispatchKey(store: EditorStore, e: KeyboardEvent): void {
     if (b.when && !b.when(state, e)) continue
     e.preventDefault()
     if (e.repeat && !b.repeat) return
+    // Once this physical press cuts a segment, its repeats must never delete the owner.
+    if (!cmd && (key === 'delete' || key === 'backspace') && isNodeSelect(state.ui) && state.selection.segment) {
+      segmentDeletes.add(key)
+    }
     b.run(store, e)
     return
   }
@@ -221,7 +241,8 @@ export function useShortcuts(): void {
 
   useEffect(() => {
     const controller = new AbortController()
-    window.addEventListener('keydown', (e) => dispatchKey(store, e), { signal: controller.signal })
+    const segmentDeletes = new Set<string>()
+    window.addEventListener('keydown', (e) => dispatchKey(store, e, segmentDeletes), { signal: controller.signal })
     return () => controller.abort()
   }, [store])
 }

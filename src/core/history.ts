@@ -1,8 +1,26 @@
-import type { IconDoc } from './model'
+import { segmentBetween, type Segment } from './geometry/segments'
+import type { IconDoc, Subpath } from './model'
 
 // Selection is UI state, not document data, so it lives beside history rather than inside the doc.
 export type NodeRef = { shapeId: string; subpathId: string; nodeId: string }
-export type Selection = { shapeIds: string[]; nodes: NodeRef[] }
+// Direction matters: a two-anchor closed contour has both A→B and B→A.
+export type SegmentRef = { shapeId: string; subpathId: string; fromId: string; toId: string }
+export type Selection = { shapeIds: string[]; nodes: NodeRef[]; segment?: SegmentRef }
+
+export function resolveSegment(doc: IconDoc, ref: SegmentRef): { subpath: Subpath; segment: Segment } | undefined {
+  const subpath = doc.shapes.find((s) => s.id === ref.shapeId)?.subpaths.find((sp) => sp.id === ref.subpathId)
+  if (!subpath || subpath.nodes.length < 2) return
+  const { nodes, closed } = subpath
+  const i = nodes.findIndex((n) => n.id === ref.fromId)
+  if (i < 0 || (!closed && i === nodes.length - 1)) return
+  const to = nodes[(i + 1) % nodes.length]
+  if (to.id === ref.toId) return { subpath, segment: segmentBetween(i, nodes[i], to) }
+}
+
+export function withoutSegment(sel: Selection): Selection {
+  return sel.segment ? { shapeIds: sel.shapeIds, nodes: sel.nodes } : sel
+}
+
 
 export const emptySelection: Selection = { shapeIds: [], nodes: [] }
 
@@ -27,10 +45,14 @@ export function pruneSelection(sel: Selection, doc: IconDoc): Selection {
     const subpath = shapes.get(ref.shapeId)?.subpaths.find((sp) => sp.id === ref.subpathId)
     return subpath?.nodes.some((n) => n.id === ref.nodeId) ?? false
   }
-  return {
+  const next: Selection = {
     shapeIds: sel.shapeIds.filter((id) => shapes.has(id)),
     nodes: sel.nodes.filter(hasNode),
   }
+  if (sel.segment && !sel.nodes.length && next.shapeIds.includes(sel.segment.shapeId) && resolveSegment(doc, sel.segment)) {
+    next.segment = { ...sel.segment }
+  }
+  return next
 }
 
 // A new entry clears the redo stack and drops the oldest entry past HISTORY_LIMIT.

@@ -31,3 +31,10 @@
   stroke: #1e7be0;
   stroke-width: 1px;
 }
+
+.segmentSelected {
+  fill: none;
+  stroke: #1e7be0;
+  stroke-width: 4px;
+  stroke-linecap: round;
+}

@@ -156,6 +156,23 @@ export function breakAtNodes(shape: PathShape, nodeIds: ReadonlySet<string>): Pa
   return { ...shape, subpaths }
 }
 
+// Cut one edge without moving any control point on the surviving edges.
+export function cutSegmentAt(sp: Subpath, index: number): Subpath[] {
+  const { nodes, closed } = sp
+  if (nodes.length < 2 || !Number.isInteger(index) || index < 0 || index >= nodes.length - (closed ? 0 : 1)) {
+    return [sp]
+  }
+  const left = nodes.slice(0, index + 1)
+  const right = nodes.slice(index + 1)
+  const runs = closed ? [[...right, ...left]] : [left, right]
+  return runs.filter((run) => run.length >= 2).map((run, i) => {
+    run[0] = withHandle(run[0], 'hIn', undefined)
+    const last = run.length - 1
+    run[last] = withHandle(run[last], 'hOut', undefined)
+    return { id: i === 0 ? sp.id : newId(), closed: false, nodes: run }
+  })
+}
+
 // Maximal runs of surviving nodes, in path order. A closed subpath is scanned starting just after a removed node,
 // so a run that crosses the array's end is not split and the first run comes right after the removal.
 function survivingRuns(sp: Subpath, nodeIds: ReadonlySet<string>): PathNode[][] {

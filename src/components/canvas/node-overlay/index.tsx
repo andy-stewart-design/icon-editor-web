@@ -21,6 +21,10 @@ export default function NodeOverlay() {
   return (
     <svg className={s.layer} aria-hidden="true">
       {prims.map((p, i) => {
+        if (p.kind === 'segmentSelected') {
+          const [a, b, c, d] = [p.from, p.c1, p.c2, p.to].map((pt) => docToScreen(vp, pt))
+          return <path key={i} className={s.segmentSelected} d={`M${a.x},${a.y} C${b.x},${b.y} ${c.x},${c.y} ${d.x},${d.y}`} />
+        }
         if (p.kind === 'anchor') {
           const c = docToScreen(vp, p.p)
           return (
