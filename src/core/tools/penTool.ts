@@ -1,10 +1,10 @@
-import { drawContour } from '../commands/nodes'
+import { drawContour, insertNode } from '../commands/nodes'
 import { newId } from '../ids'
 import type { PathNode, PathShape, Pt, Subpath } from '../model'
 import { toolContext, type EditorStore } from '../store'
 import type { SnapResult } from '../snap'
 import { addShapeCommand, snapIndicator } from './dragTool'
-import { extendPenContour, resolvePenEndpoint } from './penTarget'
+import { extendPenContour, idlePenTarget, resolvePenEndpoint } from './penTarget'
 import { DRAG_THRESHOLD_PX, HIT_TOLERANCE_PX } from './selectTool'
 import type { OverlayPrimitive, PenContext, Tool, ToolEvent, ToolHost } from './types'
 
@@ -57,6 +57,12 @@ export function createPenTool(
   let fresh = false
   let transitioning = false
   let press: Press | null = null
+  let insertion: {
+    shape: PathShape
+    at: Parameters<typeof insertNode>[2]
+    origin: Pt
+    dragged: boolean
+  } | null = null
   let rubber: Pt | null = null // snapped pointer while no press is active; the rubber band ends here
   let hoverNearClose = false // no press: the pointer is in the close hit zone
   let targets: Targets | null = null // snap targets hit by the press or the hover
@@ -92,12 +98,20 @@ export function createPenTool(
     destination = undefined
     fresh = false
     press = null
+    insertion = null
     resetHover()
   }
 
   const currentShape = (id: string) => host.getState().doc.shapes.find((s) => s.id === id)
   const validate = () => {
     if (transitioning) return true
+    if (insertion) {
+      const shape = selectedShape()
+      if (shape?.id === insertion.shape.id && shape.subpaths === insertion.shape.subpaths)
+        return true
+      finish()
+      return false
+    }
     const pinned = destination ?? press?.start
     if (!pinned || currentShape(pinned.shape.id)?.subpaths === pinned.shape.subpaths) return true
     finish()
@@ -154,6 +168,12 @@ export function createPenTool(
   }
 
   const move = (e: ToolEvent): void => {
+    if (insertion) {
+      insertion.dragged ||=
+        Math.hypot(e.pt.x - insertion.origin.x, e.pt.y - insertion.origin.y) * e.zoom >=
+        DRAG_THRESHOLD_PX
+      return
+    }
     const p = press
     if (!p || p.start?.endpoint || (p.closing && !fresh)) return
     if (
@@ -171,14 +191,31 @@ export function createPenTool(
     cursor: 'crosshair',
 
     pointerDown(e) {
-      if (press) return
+      if (press || insertion) return
       validate()
       resetHover()
       let start: Destination | undefined
       if (context.mode === 'node' && !destination) {
         const shape = selectedShape()
         if (!shape) return
-        start = { shape, endpoint: resolvePenEndpoint(shape, e.pt, e.zoom) }
+        const target = idlePenTarget(shape, e.pt, e.zoom, host.getState().doc.strokeWidth)
+        if (target.kind === 'blocked') return
+        if (target.kind === 'insert') {
+          const { hit } = target
+          insertion = {
+            shape,
+            at: {
+              shapeId: shape.id,
+              subpathId: shape.subpaths[hit.subpathIndex].id,
+              segIndex: hit.segIndex,
+              t: hit.t,
+            },
+            origin: e.pt,
+            dragged: false,
+          }
+          return
+        }
+        start = { shape, endpoint: target.kind === 'resume' ? target.endpoint : null }
         if (start.endpoint) {
           press = {
             start,
@@ -213,6 +250,17 @@ export function createPenTool(
     },
 
     pointerUp(e) {
+      if (insertion) {
+        if (!validate()) return
+        move(e)
+        const { at, dragged } = insertion
+        insertion = null
+        const { doc, selection, tx } = host.getState()
+        if (!dragged && !tx) {
+          host.dispatch(insertNode(doc, selection, at))
+        }
+        return
+      }
       const p = press
       if (!p || !validate()) return
       move(e)
@@ -254,6 +302,7 @@ export function createPenTool(
     pointerCancel() {
       // Drops the press only. Placed nodes stay, so the path can still be finished.
       press = null
+      insertion = null
       resetHover()
     },
 
@@ -263,7 +312,7 @@ export function createPenTool(
 
     // Called by the host on plain moves, when no press is active.
     hover(e) {
-      if (press || transitioning) return
+      if (press || insertion || transitioning) return
       validate()
       track(e)
     },
@@ -271,7 +320,7 @@ export function createPenTool(
     refreshHover() {
       if (transitioning) return
       validate()
-      if (!press && lastHover) track(lastHover)
+      if (!press && !insertion && lastHover) track(lastHover)
     },
 
     // Changing tools ends the live session without writing geometry.
@@ -282,6 +331,7 @@ export function createPenTool(
     beforeHistory(direction) {
       validate()
       press = null
+      insertion = null
       resetHover()
       if (direction === 'undo' && provisional) {
         finish()
@@ -308,21 +358,14 @@ export function createPenTool(
 
     overlay() {
       const out: OverlayPrimitive[] = []
-      const waitingForTarget = context.mode === 'node' && !destination && !press
-      const idleShape = waitingForTarget ? selectedShape() : undefined
+      const waitingForTarget = context.mode === 'node' && !destination && !press && !insertion
+      const selected = selectedShape()
+      const idleShape = waitingForTarget ? selected : undefined
       if (waitingForTarget && !idleShape) return out
-      const resume =
-        idleShape && lastHover && resolvePenEndpoint(idleShape, lastHover.pt, lastHover.zoom)
-      if (idleShape) {
-        for (const subpath of idleShape.subpaths) {
-          if (subpath.closed || !subpath.nodes.length) continue
-          const head = subpath.nodes[0]
-          out.push({ kind: 'penEndpoint', p: head.p })
-          if (subpath.nodes.length > 1)
-            out.push({ kind: 'penEndpoint', p: subpath.nodes[subpath.nodes.length - 1].p })
-        }
-        if (resume) out.push({ kind: 'penResume', p: resume.node.p })
-      }
+      const idleTarget =
+        idleShape &&
+        lastHover &&
+        idlePenTarget(idleShape, lastHover.pt, lastHover.zoom, host.getState().doc.strokeWidth)
       const endpoint = destination?.endpoint ?? press?.start?.endpoint
       const closing = press?.closing === true
       const close = closeAnchor()
@@ -344,8 +387,46 @@ export function createPenTool(
       if (from && to && Math.hypot(from.p.x - to.p.x, from.p.y - to.p.y) >= 1e-9)
         out.push({ kind: 'draft', shape: previewPath([from, to]) })
 
-      for (const n of [...placed, ...(pending ? [pending] : [])])
-        out.push({ kind: 'anchor', p: n.p })
+      const showClose = close && (closing || (!press && hoverNearClose))
+      // Follow the pinned drawing destination during a gesture; otherwise use the
+      // current selection. Read committed anchors from the document, not gesture state.
+      const pinned = destination ?? press?.start
+      const shape =
+        context.mode === 'node'
+          ? pinned
+            ? currentShape(pinned.shape.id)
+            : selectedShape()
+          : undefined
+      const resume = idleTarget?.kind === 'resume' ? idleTarget.endpoint.node : undefined
+      const projected = idleTarget?.kind === 'insert' ? idleTarget.hit.point : undefined
+      const marked = new Set<string>()
+      const mark = (
+        kind: 'anchor' | 'penEndpoint' | 'penResume' | 'closeTarget' | 'nodeHover',
+        p: Pt,
+      ) => {
+        const key = `${p.x},${p.y}`
+        if (marked.has(key)) return
+        marked.add(key)
+        out.push({ kind, p })
+      }
+      // A cue replaces the ordinary marker at the same spot.
+      if (resume) mark('penResume', resume.p)
+      if (projected) mark('nodeHover', projected)
+      if (showClose && shape) mark('closeTarget', close.p)
+      for (const n of [...placed, ...(pending ? [pending] : [])]) {
+        if (shape) mark('anchor', n.p)
+        else out.push({ kind: 'anchor', p: n.p })
+      }
+      if (idleShape) {
+        for (const { closed, nodes } of idleShape.subpaths) {
+          if (closed || !nodes.length) continue
+          mark('penEndpoint', nodes[0].p)
+          mark('penEndpoint', nodes[nodes.length - 1].p)
+        }
+      }
+      for (const subpath of shape?.subpaths ?? []) {
+        for (const node of subpath.nodes) mark('anchor', node.p)
+      }
 
       const handleNodes = [
         placed[placed.length - 1],
@@ -358,9 +439,9 @@ export function createPenTool(
         if (n.hOut) out.push({ kind: 'handle', from: n.p, to: n.hOut })
       }
 
-      if (close && (closing || (!press && hoverNearClose)))
-        out.push({ kind: 'closeTarget', p: close.p })
-      if (targets && !resume) out.push(...snapIndicator(targets))
+      if (showClose && !shape) out.push({ kind: 'closeTarget', p: close.p })
+      if (targets && (!idleTarget || idleTarget.kind === 'empty'))
+        out.push(...snapIndicator(targets))
       return out
     },
   }

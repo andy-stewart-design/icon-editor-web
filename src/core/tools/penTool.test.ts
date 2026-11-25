@@ -271,7 +271,7 @@ describe('Pen drawing contexts', () => {
   it('clears idle endpoint feedback for ineligible selection and refreshes after selection and geometry edits', () => {
     const { store, tool, doc, select } = seeded()
     tool.hover?.(ev(2, 2))
-    expect(tool.overlay().filter((p) => p.kind === 'penEndpoint')).toHaveLength(4)
+    expect(tool.overlay().filter((p) => p.kind === 'penEndpoint')).toHaveLength(3)
     for (const ids of [[], ['a', 'b']]) {
       select(...ids)
       tool.refreshHover?.()
@@ -285,13 +285,29 @@ describe('Pen drawing contexts', () => {
     }
     select('b')
     tool.refreshHover?.()
-    expect(tool.overlay().filter((p) => p.kind === 'penEndpoint')).toHaveLength(2)
+    expect(tool.overlay().filter((p) => p.kind === 'penEndpoint')).toHaveLength(1)
     expect(tool.overlay()).toContainEqual({ kind: 'penResume', p: { x: 2, y: 2 } })
     store.updateDoc('Move endpoint', (d) => {
       d.shapes[1].subpaths[0].nodes[0].p.x = 3
     })
     tool.refreshHover?.()
     expect(tool.overlay().some((p) => p.kind === 'penResume')).toBe(false)
+  })
+
+  it('shows the pinned shape during drawing and returns to the selection on finish', () => {
+    const { tool, select } = seeded()
+    click(tool, 12, 2)
+    select('b')
+    tool.refreshHover?.()
+    const marks = tool.overlay().filter((p) => p.kind === 'anchor')
+    expect(marks).toHaveLength(6)
+    expect(marks).toContainEqual({ kind: 'anchor', p: { x: 2, y: 14 } })
+    expect(marks.filter((p) => p.p.x === 12 && p.p.y === 2)).toHaveLength(1)
+    tool.keyDown('Enter')
+    expect(tool.overlay()).toEqual([
+      { kind: 'penEndpoint', p: { x: 2, y: 2 } },
+      { kind: 'penEndpoint', p: { x: 8, y: 8 } },
+    ])
   })
 
   it('uses the same stable overlap winner for hover and press, without joining another contour', () => {
@@ -311,33 +327,119 @@ describe('Pen drawing contexts', () => {
     expect(shape.subpaths[1]).toBe(original)
   })
 
-  it.each(['interior', 'closed', 'other shape'] as const)(
-    'starts a new contour, not a continuation, at a %s anchor',
-    (kind) => {
-      const { store, tool } = seeded()
-      store.updateDoc('Seed interior', (d) => {
-        d.shapes[0].subpaths[0].nodes.splice(1, 0, {
-          id: 'interior',
-          p: { x: 7, y: 2 },
-          mode: 'corner',
-        })
+  it('shows open interior and closed anchors without making them interactive', () => {
+    const { store, tool } = seeded()
+    store.updateDoc('Seed interior', (d) => {
+      d.shapes[0].subpaths[0].nodes.splice(1, 0, {
+        id: 'interior',
+        p: { x: 7, y: 2 },
+        mode: 'corner',
       })
-      const old = store.getState().doc.shapes[0].subpaths
-      const pt =
-        kind === 'interior'
-          ? ([7, 2] as const)
-          : kind === 'closed'
-            ? ([2, 14] as const)
-            : ([8, 8] as const)
-      tool.hover?.(ev(pt[0], pt[1]))
-      expect(tool.overlay().some((p) => p.kind === 'penResume')).toBe(false)
-      click(tool, pt[0], pt[1])
-      click(tool, 22, 8)
-      click(tool, pt[0], pt[1])
-      const after = store.getState().doc
-      expect(after.shapes[0].subpaths.slice(0, 3)).toEqual(old)
-      expect(serializeBody(after)).toContain(`M${pt.join(' ')}L22 8Z`)
-      expect(store.getState().history.past).toHaveLength(3)
+    })
+    expect(tool.overlay()).toEqual([
+      { kind: 'penEndpoint', p: { x: 2, y: 2 } },
+      { kind: 'penEndpoint', p: { x: 12, y: 2 } },
+      { kind: 'penEndpoint', p: { x: 22, y: 2 } },
+      { kind: 'penEndpoint', p: { x: 22, y: 8 } },
+      { kind: 'anchor', p: { x: 7, y: 2 } },
+      { kind: 'anchor', p: { x: 2, y: 14 } },
+      { kind: 'anchor', p: { x: 12, y: 14 } },
+    ])
+    const { doc } = store.getState()
+    for (const [x, y] of [
+      [7, 2],
+      [2, 14],
+    ]) {
+      tool.hover?.(ev(x, y))
+      expect(tool.overlay().some((p) => p.kind === 'penResume' || p.kind === 'nodeHover')).toBe(
+        false,
+      )
+      click(tool, x, y)
+    }
+    expect(store.getState().doc).toBe(doc)
+  })
+
+  it('still allows a disconnected contour over an unselected shape', () => {
+    const { store, tool } = seeded()
+    click(tool, 8, 8)
+    click(tool, 22, 8)
+    click(tool, 8, 8)
+    expect(serializeBody(store.getState().doc)).toContain('M8 8L22 8Z')
+  })
+
+  it('inserts on open curves and closed segments, matching the raw projected hover point', () => {
+    const { store, tool, doc } = seeded()
+    for (const [index, y, projectedY] of [
+      [0, 4.5, 4.25],
+      [2, 14.5, 14],
+    ]) {
+      const e = ev(7, y, { snap: () => noSnap({ x: 18, y: 8 }) })
+      tool.hover?.(e)
+      expect(tool.overlay()).toContainEqual({ kind: 'nodeHover', p: { x: 7, y: projectedY } })
+      tool.pointerDown(e)
+      expect(store.getState().history.past).toHaveLength(index === 0 ? 0 : 1)
+      tool.pointerUp(e)
+      const { doc: after, history, selection, ui } = store.getState()
+      const sp = after.shapes[0].subpaths[index]
+      expect(sp.nodes).toHaveLength(3)
+      expect(sp.nodes[1].p).toEqual({ x: 7, y: projectedY })
+      expect(sp.nodes[1].mode).toBe(index === 0 ? 'smooth' : 'corner')
+      const marker = { kind: 'anchor', p: sp.nodes[1].p }
+      expect(tool.overlay().filter((p) => p.kind === 'anchor' && p.p === sp.nodes[1].p)).toEqual([
+        marker,
+      ])
+      expect(tool.overlay().some((p) => p.kind === 'draft')).toBe(false)
+      tool.hover?.(e)
+      expect(tool.overlay()).toContainEqual(marker)
+      tool.hover?.(ev(22, 22))
+      expect(tool.overlay()).toContainEqual(marker)
+      expect(selection.nodes[0].nodeId).toBe(sp.nodes[1].id)
+      expect(toolContext(ui)).toBe('node-pen')
+      expect(history.past.at(-1)?.label).toBe('Insert node')
+    }
+    expect(store.getState().history.past).toHaveLength(2)
+    store.undo()
+    expect(tool.overlay()).not.toContainEqual({ kind: 'anchor', p: { x: 7, y: 14 } })
+    expect(tool.overlay()).toContainEqual({ kind: 'anchor', p: { x: 7, y: 4.25 } })
+    store.undo()
+    expect(tool.overlay()).not.toContainEqual({ kind: 'anchor', p: { x: 7, y: 4.25 } })
+    expect(store.getState().doc).toBe(doc)
+  })
+
+  it.each(['drag', 'cancel', 'selection', 'geometry'] as const)(
+    'does not insert after %s',
+    (kind) => {
+      const { store, tool, select } = seeded()
+      const e = ev(7, 4.25)
+      tool.pointerDown(e)
+      if (kind === 'drag') tool.pointerMove(ev(8, 4.25))
+      if (kind === 'cancel') tool.pointerCancel()
+      if (kind === 'selection') select('b')
+      if (kind === 'geometry')
+        store.updateDoc('Move anchor', (d) => {
+          d.shapes[0].subpaths[0].nodes[0].p.x += 1
+        })
+      const { doc } = store.getState()
+      tool.pointerUp(e)
+      expect(store.getState().doc).toBe(doc)
+      expect(tool.overlay()).not.toContainEqual({ kind: 'anchor', p: e.pt })
+    },
+  )
+
+  it.each(['provisional', 'resumed'] as const)(
+    'adds to the %s contour over another segment',
+    (kind) => {
+      const { store, tool, a } = seeded()
+      if (kind === 'provisional') click(tool, 7, 9)
+      else click(tool, 22, 8)
+      tool.hover?.(ev(7, 4.25))
+      expect(tool.overlay().some((p) => p.kind === 'nodeHover')).toBe(false)
+      click(tool, 7, 4.25)
+      const { doc, history } = store.getState()
+      expect(doc.shapes[0].subpaths[0]).toBe(a.subpaths[0])
+      const contour = doc.shapes[0].subpaths[kind === 'provisional' ? 3 : 1]
+      expect(contour.nodes.at(-1)?.p).toEqual({ x: 7, y: 4.25 })
+      expect(history.past).toHaveLength(1)
     },
   )
 
@@ -398,12 +500,12 @@ describe('Pen drawing contexts', () => {
     tool.pointerUp(ev(9, 9))
     expect(toolContext(store.getState().ui)).toBe(`${mode}-pen`)
     expect(store.getState()).toBe(before)
-    expect(tool.overlay().some((p) => p.kind === 'anchor')).toBe(false)
+    expect(tool.overlay()).not.toContainEqual({ kind: 'anchor', p: { x: 4, y: 9 } })
     expect(committed).toHaveLength(0)
     click(tool, 4, 9)
     store.redo()
     expect(committed).toHaveLength(1)
-    expect(tool.overlay().some((p) => p.kind === 'anchor')).toBe(false)
+    expect(tool.overlay()).not.toContainEqual({ kind: 'anchor', p: { x: 4, y: 9 } })
     click(tool, 4, 9)
     store.redo() // unavailable: keep the provisional point
     expect(tool.overlay()).toContainEqual({ kind: 'anchor', p: { x: 4, y: 9 } })
@@ -429,7 +531,7 @@ describe('Pen drawing contexts', () => {
       const before = store.getState()
       tool.pointerUp(ev(5, 8))
       expect(store.getState()).toBe(before)
-      expect(tool.overlay().some((p) => p.kind === 'anchor')).toBe(false)
+      expect(tool.overlay()).not.toContainEqual({ kind: 'anchor', p: { x: 5, y: 8 } })
     },
   )
 
@@ -579,6 +681,7 @@ describe('Pen drawing contexts', () => {
     expect(tool.overlay()).toContainEqual({ kind: 'anchor', p: { x: 7, y: 8 } })
     store.redo()
     expect(contour().closed).toBe(true)
-    expect(tool.overlay().some((p) => p.kind === 'anchor')).toBe(false)
+    expect(tool.overlay()).toContainEqual({ kind: 'anchor', p: { x: 7, y: 8 } })
+    expect(tool.overlay().some((p) => p.kind === 'draft' || p.kind === 'handle')).toBe(false)
   })
 })

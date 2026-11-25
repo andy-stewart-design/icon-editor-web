@@ -1,3 +1,4 @@
+import { nearestSegment } from '../geometry/nodes'
 import type { PathNode, PathShape, Pt, Subpath } from '../model'
 import { HIT_TOLERANCE_PX } from './selectTool'
 
@@ -24,6 +25,25 @@ export function resolvePenEndpoint(shape: PathShape, pt: Pt, zoom: number): PenE
     if (subpath.nodes.length > 1) consider('tail', subpath.nodes[subpath.nodes.length - 1])
   }
   return best
+}
+
+// Idle Node Pen uses the raw pointer for both the cue and the press. Anchors
+// that cannot resume consume the hit rather than starting a disconnected contour.
+export function idlePenTarget(shape: PathShape, pt: Pt, zoom: number, strokeWidth: number) {
+  const endpoint = resolvePenEndpoint(shape, pt, zoom)
+  if (endpoint) return { kind: 'resume', endpoint } as const
+  const tolerance = HIT_TOLERANCE_PX / zoom
+  if (
+    shape.subpaths.some((sp) =>
+      sp.nodes.some((n) => Math.hypot(pt.x - n.p.x, pt.y - n.p.y) <= tolerance),
+    )
+  )
+    return { kind: 'blocked' } as const
+  const hit = nearestSegment(shape, pt)
+  if (!hit || hit.distance > tolerance + (shape.style.strokeWidth ?? strokeWidth) / 2)
+    return { kind: 'empty' } as const
+  if (!(hit.t > 0 && hit.t < 1)) return { kind: 'blocked' } as const
+  return { kind: 'insert', hit } as const
 }
 
 // Placed nodes are in drawing order, excluding both existing endpoints.
