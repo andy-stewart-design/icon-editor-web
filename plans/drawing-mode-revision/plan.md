@@ -48,11 +48,11 @@ Expected files:
 
 Tasks:
 
-- [ ] Before editing, run `pnpm test src/core/tools/penTool.test.ts src/core/tools/nodeTool.test.ts src/core/serialize/index.test.ts src/core/history.test.ts` and record the baseline in this step’s evidence.
-- [ ] Resolve only the ends of open subpaths in the eligible shape, from raw pointer coordinates and the existing screen-space hit tolerance. Choose a stable winner for overlapping targets so hover and press can use the same result. Do not reuse Node Select’s segment insertion hit behavior.
-- [ ] Assemble tail extensions by appending and head extensions by prepending the new nodes in reverse placement order with their handle roles swapped. Leave the old nodes and segment direction intact. Closing uses the original opposite endpoint without adding a duplicate or rewriting a handle on an existing segment.
-- [ ] Add cases for closed and interior exclusion, overlap and zoom tolerance, curved extensions in both directions, and closure with original segments unchanged.
-- [ ] Satisfy the verification and completion gate below, and record concise evidence.
+- [x] Before editing, run `pnpm test src/core/tools/penTool.test.ts src/core/tools/nodeTool.test.ts src/core/serialize/index.test.ts src/core/history.test.ts` and record the baseline in this step’s evidence.
+- [x] Resolve only the ends of open subpaths in the eligible shape, from raw pointer coordinates and the existing screen-space hit tolerance. Choose a stable winner for overlapping targets so hover and press can use the same result. Do not reuse Node Select’s segment insertion hit behavior.
+- [x] Assemble tail extensions by appending and head extensions by prepending the new nodes in reverse placement order with their handle roles swapped. Leave the old nodes and segment direction intact. Closing uses the original opposite endpoint without adding a duplicate or rewriting a handle on an existing segment.
+- [x] Add cases for closed and interior exclusion, overlap and zoom tolerance, curved extensions in both directions, and closure with original segments unchanged.
+- [x] Satisfy the verification and completion gate below, and record concise evidence.
 
 Verification:
 
@@ -79,11 +79,11 @@ Expected files:
 
 Tasks:
 
-- [ ] Retain Shape Pen's creation and gesture behavior. For Node Pen, require one selected shape at start, pin the destination, and resolve an open endpoint or start a disconnected contour. Keep subsequent points in that contour; do not join to other contours. Expose eligible endpoint and resume feedback using the same resolver as press.
-- [ ] Preserve snapping, corner/curve drawing, closure for fresh contours, and existing finish/cancel behavior. Use the geometry helper for endpoint resumption and opposite-end closure. Drop only the pending press on pointer cancel; finish keys and deactivation commit placed points at most once.
-- [ ] Commit only the target contour or append a subpath in place. Preserve shape identity, style, stacking order, and unrelated geometry; reselect the pinned shape on success. Check its current geometry before dispatch; removal or changed geometry, a short new contour, or untouched resumption must not dispatch or consume a redo branch.
-- [ ] Add real-store tests for Shape Pen over an existing endpoint, curved head/tail extension, disconnected and closed SVG contours, ineligible starts and targets, selection changing from A to B, stale/no-op paths, finish/cancel cases, and one Undo/Redo per successful finish. Assert actual serializer output and exercise a non-identity snap for new points.
-- [ ] Satisfy the verification and completion gate below, and record concise evidence.
+- [x] Retain Shape Pen's creation and gesture behavior. For Node Pen, require one selected shape at start, pin the destination, and resolve an open endpoint or start a disconnected contour. Keep subsequent points in that contour; do not join to other contours. Expose eligible endpoint and resume feedback using the same resolver as press.
+- [x] Preserve snapping, corner/curve drawing, closure for fresh contours, and existing finish/cancel behavior. Use the geometry helper for endpoint resumption and opposite-end closure. Drop only the pending press on pointer cancel; finish keys and deactivation commit placed points at most once.
+- [x] Commit only the target contour or append a subpath in place. Preserve shape identity, style, stacking order, and unrelated geometry; reselect the pinned shape on success. Check its current geometry before dispatch; removal or changed geometry, a short new contour, or untouched resumption must not dispatch or consume a redo branch.
+- [x] Add real-store tests for Shape Pen over an existing endpoint, curved head/tail extension, disconnected and closed SVG contours, ineligible starts and targets, selection changing from A to B, stale/no-op paths, finish/cancel cases, and one Undo/Redo per successful finish. Assert actual serializer output and exercise a non-identity snap for new points.
+- [x] Satisfy the verification and completion gate below, and record concise evidence.
 
 Verification:
 
@@ -122,12 +122,12 @@ Expected files:
 
 Tasks:
 
-- [ ] Split mode from tool in the editor state and update the toolbar, shortcuts, overlays, and panel together. Default to Shape + Select; `V`/`P` preserve mode, `A` enters Node + Select, and choosing a primitive enters Shape. Preserve eligible Select Enter/idle Escape behavior and avoid activating applicable shortcuts from editable inputs.
-- [ ] Route Node + Select and Node + Pen separately. Preserve Node Select's editing predicates, and give Pen its own finish handling so the same Enter/Escape event cannot also apply a Select transition.
-- [ ] Hand off Pen contexts in order: clear the old gesture, finish the old draft once under its original mode and pinned destination, then allow new input in the next context. Include Pen-to-Pen mode switches and ignore late releases from retired gestures. Do not depend on React cleanup timing alone for this ordering.
-- [ ] Render endpoint affordances and refresh them when selection or geometry changes without pointer movement. Ensure zero/multiple selections do not show a stale resume target, and hover never invokes Node Select or changes the tool.
-- [ ] Add focused core state/routing assertions where the contract is pure; audit all tool discriminants and run the browser checklist below for behavior that requires real event routing. Remove obsolete exclusive Node-tool predicates after the replacement path has been checked.
-- [ ] Satisfy the verification and completion gate below, and record concise evidence.
+- [x] Split mode from tool in the editor state and update the toolbar, shortcuts, overlays, and panel together. Default to Shape + Select; `V`/`P` preserve mode, `A` enters Node + Select, and choosing a primitive enters Shape. Preserve eligible Select Enter/idle Escape behavior and avoid activating applicable shortcuts from editable inputs.
+- [x] Route Node + Select and Node + Pen separately. Preserve Node Select's editing predicates, and give Pen its own finish handling so the same Enter/Escape event cannot also apply a Select transition.
+- [x] Hand off Pen contexts in order: clear the old gesture, finish the old draft once under its original mode and pinned destination, then allow new input in the next context. Include Pen-to-Pen mode switches and ignore late releases from retired gestures. Do not depend on React cleanup timing alone for this ordering.
+- [x] Render endpoint affordances and refresh them when selection or geometry changes without pointer movement. Ensure zero/multiple selections do not show a stale resume target, and hover never invokes Node Select or changes the tool.
+- [x] Add focused core state/routing assertions where the contract is pure; audit all tool discriminants and run the browser checklist below for behavior that requires real event routing. Remove obsolete exclusive Node-tool predicates after the replacement path has been checked.
+- [x] Satisfy the verification and completion gate below, and record concise evidence.
 
 Verification:
 

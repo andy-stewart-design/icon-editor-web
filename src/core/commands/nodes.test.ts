@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { newId } from '../ids'
-import type { NodeRef } from '../history'
+import { resolveSegment, type NodeRef } from '../history'
 import { createDefaultDoc, type IconDoc, type PathNode, type PathShape, type Pt } from '../model'
 import { createEditorStore } from '../store'
-import { deleteSelectedNodes, nodePanelState, setNodePosition, setSelectedNodesMode } from './nodes'
+import { cutSelectedSegment, deleteSelectedNodes, nodePanelState, setNodePosition, setSelectedNodesMode } from './nodes'
 
 const n = (p: Pt, extra: Partial<PathNode> = {}): PathNode => ({ id: newId(), p, mode: 'corner', ...extra })
 const shape = (nodes: PathNode[], closed = false): PathShape => ({
@@ -167,5 +167,73 @@ describe('deleteSelectedNodes (AC22, R13)', () => {
     const out = store.getState().doc.shapes[0].subpaths[0]
     expect(out.closed).toBe(true)
     expect(out.nodes).toHaveLength(3)
+  })
+})
+
+describe('cut selected segment', () => {
+  it('resolves the closing edge, opens it in one entry and restores selection with undo only in Node Select', () => {
+    const [a, b] = [n({ x: 2, y: 5 }), n({ x: 10, y: 5 })]
+    const s = shape([a, b], true)
+    const other = shape([a, b])
+    const doc = docWith([s, other])
+    const store = createEditorStore(doc)
+    store.setUi({ mode: 'node' })
+    const segment = { shapeId: s.id, subpathId: s.subpaths[0].id, fromId: b.id, toId: a.id }
+    const selection = { shapeIds: [s.id], nodes: [], segment }
+    store.setSelection(selection)
+    expect(resolveSegment(doc, segment)?.segment.index).toBe(1)
+    store.dispatch(cutSelectedSegment(store.getState().selection))
+    const after = store.getState()
+    expect(after.history.past).toHaveLength(1)
+    expect(after.doc.shapes[1]).toBe(other)
+    expect(after.doc.shapes[0].subpaths[0].closed).toBe(false)
+    expect(after.selection).toEqual({ shapeIds: [s.id], nodes: [] })
+    expect(resolveSegment(after.doc, segment)).toBeUndefined()
+    store.undo()
+    expect(store.getState().doc).toBe(doc)
+    expect(store.getState().selection).toEqual(selection)
+    store.setUi({ activeTool: 'pen' })
+    expect(store.getState().selection.segment).toBeUndefined()
+    store.redo()
+    expect(store.getState().doc).toBe(after.doc)
+    store.undo()
+    expect(store.getState().selection.segment).toBeUndefined()
+  })
+
+  it('prunes a ref when both endpoints survive but are no longer adjacent', () => {
+    const a = n({ x: 2, y: 5 }), b = n({ x: 10, y: 5 }), mid = n({ x: 6, y: 5 })
+    const s = shape([a, b])
+    const store = createEditorStore(docWith([s]))
+    store.setUi({ mode: 'node' })
+    const selection = { shapeIds: [s.id], nodes: [], segment: {
+      shapeId: s.id, subpathId: s.subpaths[0].id, fromId: a.id, toId: b.id,
+    } }
+    store.setSelection(selection)
+    store.updateDoc('Insert between endpoints', (doc) => { doc.shapes[0].subpaths[0].nodes.splice(1, 0, mid) })
+    const after = store.getState()
+    expect(after.selection.segment).toBeUndefined()
+    store.dispatch(cutSelectedSegment(selection))
+    expect(store.getState().doc).toBe(after.doc)
+    expect(store.getState().history).toBe(after.history)
+    store.undo()
+    expect(store.getState().selection).toEqual(selection)
+  })
+
+  it('removes the owner only if the last contour is cut, including selection pruning', () => {
+    const s = shape([n({ x: 2, y: 5 }), n({ x: 10, y: 5 })])
+    const extra = shape([n({ x: 2, y: 10 }), n({ x: 10, y: 10 })]).subpaths[0]
+    s.subpaths.push(extra)
+    const store = createEditorStore(docWith([s]))
+    store.setUi({ mode: 'node' })
+    for (const sp of s.subpaths) {
+      store.setSelection({ shapeIds: [s.id], nodes: [], segment: {
+        shapeId: s.id, subpathId: sp.id, fromId: sp.nodes[0].id, toId: sp.nodes[1].id,
+      } })
+      store.dispatch(cutSelectedSegment(store.getState().selection))
+      if (sp !== extra) expect(store.getState().doc.shapes[0].subpaths[0]).toBe(extra)
+    }
+    expect(store.getState().doc.shapes).toEqual([])
+    expect(store.getState().selection.shapeIds).toEqual([])
+    expect(store.getState().history.past).toHaveLength(2)
   })
 })

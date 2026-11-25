@@ -59,3 +59,9 @@
   color: inherit;
   font-variant-numeric: tabular-nums;
 }
+
+.modeLabel {
+  color: #525252;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}

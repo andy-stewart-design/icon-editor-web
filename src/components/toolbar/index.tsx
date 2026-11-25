@@ -15,7 +15,6 @@ const SNAP_INCREMENTS: readonly SnapIncrement[] = [1, 0.5, 0.25]
 
 const DRAW_TOOLS: readonly { tool: ActiveTool; label: string; key: string }[] = [
   { tool: 'select', label: 'Select', key: 'V' },
-  { tool: 'node', label: 'Node', key: 'A' },
   { tool: 'pen', label: 'Pen', key: 'P' },
   { tool: 'line', label: 'Line', key: 'L' },
   { tool: 'rect', label: 'Rect', key: 'R' },
@@ -54,6 +53,8 @@ export default function Toolbar() {
   const snapEnabled = useEditor((e) => e.ui.snapEnabled)
   const snapIncrement = useEditor((e) => e.ui.snapIncrement)
   const zoom = useEditor((e) => e.ui.viewport.zoom)
+  const mode = useEditor((e) => e.ui.mode)
+  const targetCount = useEditor((e) => e.selection.shapeIds.length)
   const activeTool = useEditor((e) => e.ui.activeTool)
 
   const fit = () => {
@@ -95,6 +96,21 @@ export default function Toolbar() {
           Subgrid
         </button>
       </div>
+      <div className={s.group} role="group" aria-label="Editing mode">
+        <span className={s.modeLabel}>Mode</span>
+        {(['shape', 'node'] as const).map((value) => (
+          <button
+            key={value}
+            type="button"
+            className={s.button}
+            aria-pressed={mode === value}
+            title={value === 'node' ? 'Node mode (A enters Node + Select)' : 'Shape mode'}
+            onClick={() => store.setUi({ mode: value })}
+          >
+            {value === 'shape' ? 'Shape' : 'Node'}
+          </button>
+        ))}
+      </div>
       <div className={s.group} role="group" aria-label="Drawing tool">
         {DRAW_TOOLS.map(({ tool, label, key }) => (
           <button
@@ -108,6 +124,9 @@ export default function Toolbar() {
             {label}
           </button>
         ))}
+        {mode === 'node' && activeTool === 'pen' && targetCount !== 1 && (
+          <span className={s.modeLabel} role="status">Select one shape to draw</span>
+        )}
         {activeTool === 'rect' && <RadiusInput store={store} />}
       </div>
       <div className={s.group}>

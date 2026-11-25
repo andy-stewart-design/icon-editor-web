@@ -34,7 +34,7 @@ const docWith = (shapes: PathShape[]): IconDoc => ({ ...createDefaultDoc(), shap
 // Editor with snapping off, so pointer positions are exact, and a node tool on top of it.
 function setup(shapes: PathShape[], sel: Selection) {
   const store = createEditorStore(docWith(shapes))
-  store.setUi({ snapEnabled: false })
+  store.setUi({ snapEnabled: false, mode: 'node' })
   store.setSelection(sel)
   const tool = createNodeTool(store)
   return { store, tool }
@@ -50,15 +50,26 @@ function curveShape(): PathShape {
   return shape([a, b])
 }
 
-describe('node tool: segment click inserts a node (AC20)', () => {
+describe('node tool: segment selection and insertion', () => {
   it('one entry, curve unchanged within 0.01, new node selected', () => {
     const s = curveShape()
     const { store, tool } = setup([s], { shapeIds: [s.id], nodes: [] })
     const seg = segmentsOf(s.subpaths[0])[0]
     const mid = evalSegment(seg, 0.5)
 
+    const before = store.getState()
     tool.pointerDown(ev(mid.x, mid.y))
     tool.pointerUp(ev(mid.x, mid.y))
+
+    const picked = store.getState()
+    expect(picked.doc).toBe(before.doc)
+    expect(picked.history).toBe(before.history)
+    expect(picked.selection).toEqual({ shapeIds: [s.id], nodes: [], segment: {
+      shapeId: s.id, subpathId: s.subpaths[0].id, fromId: seg.from.id, toId: seg.to.id,
+    } })
+    tool.hover(ev(25, 25))
+    expect(nodeOverlay(picked.doc, picked.selection).some((p) => p.kind === 'segmentSelected')).toBe(true)
+    tool.doubleClick(ev(mid.x, mid.y))
 
     const after = store.getState()
     expect(store.getState().history.past).toHaveLength(1)
@@ -272,15 +283,17 @@ describe('node tool hover refresh after a doc change without pointer movement', 
     return { s, a, b }
   }
 
-  it('clears the segment highlight when the segment moves away from the pointer', () => {
+  it('resets the segment hover highlight and cursor when the segment moves away', () => {
     const { s, a, b } = straight()
     const { store, tool } = setup([s], { shapeIds: [s.id], nodes: [refOf(s, b)] })
     tool.hover(ev(12, 20))
     expect(tool.overlay().some((p) => p.kind === 'segmentHover')).toBe(true)
+    expect(tool.cursor).toBe('pointer')
 
     store.dispatch(translateNodes(store.getState().selection, 0, 20))
     tool.refreshHover()
     expect(tool.overlay().some((p) => p.kind === 'segmentHover')).toBe(false)
+    expect(tool.cursor).toBe('default')
     expect(nodeOf(store, s, b.id).p).toEqual({ x: 22, y: 40 })
     expect(nodeOf(store, s, a.id).p).toEqual({ x: 2, y: 20 })
   })

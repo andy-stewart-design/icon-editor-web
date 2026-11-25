@@ -8,7 +8,7 @@ import type { Recipe } from '../commands'
 import type { Rect } from '../geometry/bounds'
 import { nearestSegment } from '../geometry/nodes'
 import { segmentBetween, segmentsOf } from '../geometry/segments'
-import type { NodeRef, Selection } from '../history'
+import { resolveSegment, type NodeRef, type SegmentRef, type Selection } from '../history'
 import type { IconDoc, PathShape, Pt } from '../model'
 import type { EditorState } from '../store'
 import { snapIndicator } from './dragTool'
@@ -28,6 +28,7 @@ export type NodeHost = {
 }
 
 export type NodeTool = Tool & {
+  doubleClick: (e: ToolEvent) => void
   // Hover tracking for when no gesture is active. The host calls it on plain pointer moves.
   hover: (e: ToolEvent) => void
   refreshHover: () => void
@@ -40,8 +41,7 @@ export type NodeHit =
   | { kind: 'anchor'; ref: NodeRef; p: Pt }
   | {
       kind: 'segment'
-      shapeId: string
-      subpathId: string
+      ref: SegmentRef
       segIndex: number
       t: number
       point: Pt
@@ -96,8 +96,7 @@ export function hitNode(doc: IconDoc, sel: Selection, pt: Pt, zoom: number): Nod
   const seg = segmentBetween(best.segIndex, sp.nodes[best.segIndex], sp.nodes[(best.segIndex + 1) % n])
   return {
     kind: 'segment',
-    shapeId: best.shape.id,
-    subpathId: sp.id,
+    ref: { shapeId: best.shape.id, subpathId: sp.id, fromId: seg.from.id, toId: seg.to.id },
     segIndex: best.segIndex,
     t: best.t,
     point: best.point,
@@ -142,6 +141,8 @@ export function selectionOutline(doc: IconDoc, sel: Selection): OverlayPrimitive
 // selected nodes, as handle lines. Outlines come first so anchors and handles draw over them.
 export function nodeOverlay(doc: IconDoc, sel: Selection): OverlayPrimitive[] {
   const out: OverlayPrimitive[] = [...selectionOutline(doc, sel)]
+  const picked = sel.segment && resolveSegment(doc, sel.segment)?.segment
+  if (picked) out.push({ kind: 'segmentSelected', from: picked.from.p, c1: picked.c1, c2: picked.c2, to: picked.to.p })
   const selected = new Set(sel.nodes.map(keyOf))
   for (const shape of doc.shapes) {
     if (!sel.shapeIds.includes(shape.id)) continue
@@ -162,6 +163,7 @@ export function nodeOverlay(doc: IconDoc, sel: Selection): OverlayPrimitive[] {
 }
 
 type Gesture =
+  | { kind: 'segment'; start: Pt; dragged: boolean; ref: SegmentRef }
   | {
       kind: 'nodes' // press on an anchor: drags every selected node
       ref: Pt // pressed anchor at press; the reference point that snaps
@@ -190,8 +192,7 @@ type Gesture =
 //   Dragging past DRAG_THRESHOLD_PX moves every selected node by the same delta. The pressed node's anchor is the snap
 //   reference. Snap targets exclude the moving anchors. The gesture is one history entry.
 // - Press on a handle of a selected node and drag: moveHandle with the snapped pointer, one entry. Node modes apply.
-// - Press on a segment of a selected shape: inserts a node at the projected t (the curve keeps its shape), one entry,
-//   and the new node becomes the selection.
+// - Click a segment to select it; double-click to insert and select an anchor at the projected t.
 // - Press on the stroke of an unselected shape: selects that shape and clears the node selection (Shift adds the shape).
 //   Selection only, no entry.
 // - Press on empty space: marquee selects the anchors inside the rect (Shift adds). A plain press clears the node
@@ -218,7 +219,7 @@ export function createNodeTool(host: NodeHost): NodeTool {
       hoverCursor = 'pointer'
     } else if (hit?.kind === 'segment') {
       hoverPrim = { kind: 'segmentHover', ...hit.curve }
-      hoverCursor = 'crosshair'
+      hoverCursor = 'pointer'
     } else {
       // Unselected shapes are the only shape hits that matter here: a press selects them.
       const others = { ...doc, shapes: doc.shapes.filter((s) => !sel.shapeIds.includes(s.id)) }
@@ -270,7 +271,7 @@ export function createNodeTool(host: NodeHost): NodeTool {
     const g = gesture
     gesture = null
     hoverCursor = 'default'
-    if (!g) return
+    if (!g || g.kind === 'segment') return
     if (g.kind !== 'marquee') host.cancel()
     host.setSelection(g.before)
   }
@@ -278,6 +279,14 @@ export function createNodeTool(host: NodeHost): NodeTool {
   return {
     get cursor() {
       return gesture ? 'move' : hoverCursor
+    },
+
+    doubleClick(e) {
+      if (gesture || e.shift || e.alt || e.space || e.suspendSnap) return
+      const { doc, selection } = host.getState()
+      const hit = hitNode(doc, selection, e.pt, e.zoom)
+      if (hit?.kind !== 'segment') return
+      host.dispatch(insertNode(doc, selection, { ...hit.ref, segIndex: hit.segIndex, t: hit.t }))
     },
 
     pointerDown(e) {
@@ -299,7 +308,7 @@ export function createNodeTool(host: NodeHost): NodeTool {
         let nodes = selection.nodes
         if (e.shift && !wasSelected) nodes = [...nodes, hit.ref]
         else if (!e.shift && !wasSelected) nodes = [hit.ref]
-        if (nodes !== selection.nodes) host.setSelection({ ...selection, nodes })
+        if (nodes !== selection.nodes) host.setSelection({ shapeIds: selection.shapeIds, nodes })
         gesture = {
           kind: 'nodes',
           ref: hit.p,
@@ -317,14 +326,9 @@ export function createNodeTool(host: NodeHost): NodeTool {
       }
 
       if (hit?.kind === 'segment') {
-        host.dispatch(
-          insertNode(doc, selection, {
-            shapeId: hit.shapeId,
-            subpathId: hit.subpathId,
-            segIndex: hit.segIndex,
-            t: hit.t,
-          }),
-        )
+        if (!e.shift && !e.alt && !e.suspendSnap && !e.space) {
+          gesture = { kind: 'segment', start: e.pt, dragged: false, ref: hit.ref }
+        }
         return
       }
 
@@ -342,7 +346,7 @@ export function createNodeTool(host: NodeHost): NodeTool {
         base: e.shift ? [...selection.nodes] : [],
         before: selection,
       }
-      if (!e.shift) host.setSelection({ ...selection, nodes: [] })
+      if (!e.shift || selection.segment) host.setSelection({ shapeIds: selection.shapeIds, nodes: [] })
     },
 
     pointerMove(e) {
@@ -352,6 +356,7 @@ export function createNodeTool(host: NodeHost): NodeTool {
         return
       }
       if (g.kind === 'marquee') marqueeTo(g, e)
+      else if (g.kind === 'segment') passedThreshold(g, e)
       else if (passedThreshold(g, e)) {
         if (g.kind === 'nodes') moveNodes(g, e)
         else moveHandleTo(g, e)
@@ -362,6 +367,14 @@ export function createNodeTool(host: NodeHost): NodeTool {
       const g = gesture
       if (!g) return
       hoverCursor = 'default'
+      if (g.kind === 'segment') {
+        gesture = null
+        const { doc, selection } = host.getState()
+        if (!passedThreshold(g, e) && selection.shapeIds.includes(g.ref.shapeId) && resolveSegment(doc, g.ref)) {
+          host.setSelection({ shapeIds: [g.ref.shapeId], nodes: [], segment: g.ref })
+        }
+        return
+      }
       if (g.kind === 'marquee') {
         marqueeTo(g, e)
         gesture = null
@@ -398,14 +411,14 @@ export function createNodeTool(host: NodeHost): NodeTool {
         return
       }
       const { selection } = host.getState()
-      if (selection.nodes.length > 0) host.setSelection({ ...selection, nodes: [] })
+      if (selection.nodes.length > 0 || selection.segment) host.setSelection({ shapeIds: selection.shapeIds, nodes: [] })
     },
 
     overlay() {
       const out: OverlayPrimitive[] = []
       const g = gesture
       if (g?.kind === 'marquee') out.push({ kind: 'marquee', rect: g.rect })
-      else if (g) out.push(...g.indicator)
+      else if (g && g.kind !== 'segment') out.push(...g.indicator)
       else if (hoverPrim) out.push(hoverPrim)
       return out
     },

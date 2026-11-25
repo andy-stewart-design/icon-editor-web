@@ -1,6 +1,7 @@
 import type { Command, Recipe } from '../commands'
 import {
   breakAtNodes,
+  cutSegmentAt,
   deleteNodes,
   insertNodeAt,
   moveAnchor,
@@ -8,7 +9,7 @@ import {
   retractHandles,
   setNodeMode,
 } from '../geometry/nodes'
-import type { NodeRef, Selection } from '../history'
+import { resolveSegment, withoutSegment, type NodeRef, type Selection } from '../history'
 import type { IconDoc, PathNode, PathShape, Pt, Subpath } from '../model'
 
 // Node commands. Each one is a single history entry. Recipes act on the node refs in the selection; a ref that no
@@ -228,6 +229,25 @@ export function deleteSelectedNodes(sel: Selection, mode: DeleteNodesMode): Comm
   }
 }
 
+export function cutSelectedSegment(sel: Selection): Command {
+  const ref = sel.segment
+  return {
+    label: 'Cut segment',
+    recipe: (doc) => {
+      if (!ref || sel.nodes.length || !sel.shapeIds.includes(ref.shapeId)) return
+      const resolved = resolveSegment(doc, ref)
+      if (!resolved) return
+      const i = doc.shapes.findIndex((s) => s.id === ref.shapeId)
+      const { subpaths } = doc.shapes[i]
+      const j = subpaths.findIndex((sp) => sp.id === ref.subpathId)
+      const runs = cutSegmentAt(plainSubpath(resolved.subpath), resolved.segment.index)
+      subpaths.splice(j, 1, ...runs)
+      if (!subpaths.length) doc.shapes.splice(i, 1)
+    },
+    selectionAfter: withoutSegment(sel),
+  }
+}
+
 // Resolves the selected node refs against the doc. Refs that no longer exist are dropped.
 export function selectedNodes(doc: IconDoc, sel: Selection): ResolvedNode[] {
   const out: ResolvedNode[] = []
@@ -259,5 +279,24 @@ export function nodePanelState(doc: IconDoc, sel: Selection): NodePanelState | n
     x: axis(picked.map((r) => r.node.p.x)),
     y: axis(picked.map((r) => r.node.p.y)),
     mode: modes.every((m) => m === modes[0]) ? modes[0] : 'mixed',
+  }
+}
+
+// Build the edit only while the pinned geometry is current. The store uses immutable snapshots;
+// comparing the subpaths reference allows unrelated changes (including style) to survive.
+export function drawContour(doc: IconDoc, pinned: PathShape, next: Subpath, previous?: Subpath): Command | null {
+  const target = doc.shapes.find((s) => s.id === pinned.id)
+  if (!target || target.subpaths !== pinned.subpaths || next === previous) return null
+  const index = previous ? target.subpaths.indexOf(previous) : -1
+  if (previous && index < 0) return null
+  return {
+    label: 'Draw contour',
+    recipe: (draft) => {
+      const shape = draft.shapes.find((s) => s.id === pinned.id)
+      if (!shape) return
+      if (index < 0) shape.subpaths.push(next)
+      else shape.subpaths[index] = next
+    },
+    selectionAfter: { shapeIds: [pinned.id], nodes: [] },
   }
 }

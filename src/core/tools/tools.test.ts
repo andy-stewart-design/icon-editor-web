@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createDefaultDoc, type PathShape } from '../model'
-import { createEditorStore } from '../store'
+import { createEditorStore, isNodeSelect, toolContext } from '../store'
 import { createEllipseTool } from './ellipseTool'
 import { createLineTool } from './lineTool'
 import { createRectTool } from './rectTool'
@@ -162,5 +162,39 @@ describe('line tool (R9, AC13)', () => {
     expect(p0).toEqual({ x: 2, y: 2 })
     expect(p1.x).toBeCloseTo(2 + len * Math.SQRT1_2, 10)
     expect(p1.y).toBeCloseTo(2 + len * Math.SQRT1_2, 10)
+  })
+})
+
+describe('editor tool contexts', () => {
+  it('keeps Select and Pen independent of editing mode', () => {
+    const store = createEditorStore(createDefaultDoc())
+    const route = () => toolContext(store.getState().ui)
+    expect(route()).toBe('shape-select')
+    store.setUi({ mode: 'node', activeTool: 'select' })
+    expect(route()).toBe('node-select')
+    expect(isNodeSelect(store.getState().ui)).toBe(true)
+    store.setUi({ activeTool: 'pen' })
+    expect(route()).toBe('node-pen')
+    expect(isNodeSelect(store.getState().ui)).toBe(false)
+    store.setUi({ mode: 'shape' })
+    expect(route()).toBe('shape-pen')
+    store.setUi({ mode: 'node' })
+    store.setUi({ activeTool: 'select' })
+    expect(route()).toBe('node-select')
+  })
+
+  it.each(['line', 'rect', 'ellipse'] as const)('choosing %s enters Shape atomically', (activeTool) => {
+    const store = createEditorStore(createDefaultDoc())
+    store.setUi({ mode: 'node', activeTool: 'pen' })
+    const seen: string[] = []
+    const unsubscribe = store.subscribe(() => {
+      const { ui } = store.getState()
+      seen.push(`${ui.mode}:${toolContext(ui)}`)
+    })
+    store.setUi({ activeTool })
+    expect(seen).toEqual([`shape:${activeTool}`])
+    unsubscribe()
+    store.setUi({ mode: 'node' })
+    expect(toolContext(store.getState().ui)).toBe('node-select')
   })
 })
