@@ -55,15 +55,25 @@ const tool = (key: string, activeTool: ActiveTool, shift: Shift = 'any'): Bindin
   run: (store) => store.setUi({ activeTool }),
 })
 
-// Nudge step: the snap increment, or 1 unit with Shift. `nodes` picks the Node tool's node nudge over shape nudge.
-const nudge = (dir: NudgeDir, nodes: boolean): Binding['run'] => {
+// While a gesture is open, its transaction owns document edits.
+const nudge = (dir: NudgeDir): Binding => {
   const [ux, uy] =
     dir === 'left' ? [-1, 0] : dir === 'right' ? [1, 0] : dir === 'up' ? [0, -1] : [0, 1]
-  return (store, e) => {
-    const { selection, ui } = store.getState()
-    const step = nudgeAmount(ui.snapIncrement, e.shiftKey)
-    if (nodes) store.dispatch(translateNodes(selection, ux * step, uy * step))
-    else store.dispatch(nudgeSelection(selection, dir, ui.snapIncrement, e.shiftKey))
+  return {
+    keys: [`arrow${dir}`],
+    shift: 'any',
+    when: (s) => !s.tx && (nodeContext(s) || hasShapes(s)),
+    repeat: true,
+    run: (store, e) => {
+      const state = store.getState()
+      const { selection, ui } = state
+      if (nodeContext(state)) {
+        const step = nudgeAmount(ui.snapIncrement, e.shiftKey)
+        store.dispatch(translateNodes(selection, ux * step, uy * step))
+      } else {
+        store.dispatch(nudgeSelection(selection, dir, ui.snapIncrement, e.shiftKey))
+      }
+    },
   }
 }
 
@@ -177,21 +187,10 @@ const BINDINGS: readonly Binding[] = [
   flip('h'),
   flip('v'),
 
-  // Nudge. Node-tool nudging comes first so it wins over shape nudging when nodes are selected.
-  { keys: ['arrowleft'], shift: 'any', when: nodeContext, repeat: true, run: nudge('left', true) },
-  {
-    keys: ['arrowright'],
-    shift: 'any',
-    when: nodeContext,
-    repeat: true,
-    run: nudge('right', true),
-  },
-  { keys: ['arrowup'], shift: 'any', when: nodeContext, repeat: true, run: nudge('up', true) },
-  { keys: ['arrowdown'], shift: 'any', when: nodeContext, repeat: true, run: nudge('down', true) },
-  { keys: ['arrowleft'], shift: 'any', when: hasShapes, repeat: true, run: nudge('left', false) },
-  { keys: ['arrowright'], shift: 'any', when: hasShapes, repeat: true, run: nudge('right', false) },
-  { keys: ['arrowup'], shift: 'any', when: hasShapes, repeat: true, run: nudge('up', false) },
-  { keys: ['arrowdown'], shift: 'any', when: hasShapes, repeat: true, run: nudge('down', false) },
+  nudge('left'),
+  nudge('right'),
+  nudge('up'),
+  nudge('down'),
 
   // '+' can be shifted (main keyboard) or unshifted (e.g. keypad).
   { keys: ['+'], cmd: true, shift: 'any', run: zoomIn },

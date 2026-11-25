@@ -136,7 +136,7 @@ describe('select tool click versus drag', () => {
 })
 
 describe('nudge and select-all commands (AC12)', () => {
-  it('moves by the increment (even with snapping off) or 1 unit with Shift, one entry each', () => {
+  it('moves by the increment (even with snapping off) or eight times the increment with Shift, one entry each', () => {
     const line = hline(4)
     const store = createEditorStore(docWith([line]))
     store.setUi({ snapEnabled: false, snapIncrement: 0.5 })
@@ -146,7 +146,7 @@ describe('nudge and select-all commands (AC12)', () => {
     store.dispatch(nudgeSelection(store.getState().selection, 'right', 0.5, false))
     expect(x0()).toBe(2.5)
     store.dispatch(nudgeSelection(store.getState().selection, 'right', 0.5, true))
-    expect(x0()).toBe(3.5)
+    expect(x0()).toBe(6.5)
     expect(store.getState().history.past).toHaveLength(2)
   })
 

@@ -41,9 +41,9 @@ export function translateSelection(
 
 export type NudgeDir = 'left' | 'right' | 'up' | 'down'
 
-// Nudge step in doc units. Uses the snap increment even when snapping is off; Shift is always 1 unit.
+// Nudge step in doc units. Uses the snap increment even when snapping is off; Shift multiplies it by 8.
 export function nudgeAmount(increment: number, shift: boolean): number {
-  return shift ? 1 : increment
+  return shift ? increment * 8 : increment
 }
 
 const DIR: Record<NudgeDir, [number, number]> = {

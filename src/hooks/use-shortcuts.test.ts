@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createDefaultDoc, createEditorStore, screenToDoc } from '../core'
+import { makeLine } from '../core/geometry/shapes'
 import { dispatchKey } from './use-shortcuts'
 
 class ElementStub extends EventTarget {
@@ -9,12 +10,17 @@ class ElementStub extends EventTarget {
 beforeEach(() => vi.stubGlobal('HTMLElement', ElementStub))
 afterEach(() => vi.unstubAllGlobals())
 
-function setup() {
-  const store = createEditorStore(createDefaultDoc())
+function setup(doc = createDefaultDoc()) {
+  const store = createEditorStore(doc)
   const viewport = { zoom: 4, panX: 50, panY: -25 }
   store.setUi({ viewport, canvasSize: { width: 600, height: 400 } })
   const press = (key: string, options: KeyboardEventInit, target: EventTarget | null = null) => {
-    const e = Object.assign(new Event('keydown', { cancelable: true }), { key, ...options })
+    const e = Object.assign(new Event('keydown', { cancelable: true }), {
+      key,
+      metaKey: false,
+      ctrlKey: false,
+      ...options,
+    })
     Object.defineProperty(e, 'target', { value: target })
     dispatchKey(store, e as KeyboardEvent, new Set())
     return e.defaultPrevented
@@ -52,5 +58,59 @@ describe('canvas zoom shortcuts', () => {
     expect(press('-', { ctrlKey: true, shiftKey: true })).toBe(false)
     expect(press('=', { ctrlKey: true }, new ElementStub())).toBe(false)
     expect(store.getState().ui.viewport).toBe(viewport)
+  })
+})
+
+function setupNudge(mode: 'shape' | 'node') {
+  const line = makeLine({ x: 2, y: 4 }, { x: 12, y: 4 })
+  if (!line) throw new Error('degenerate line')
+  const { store, press } = setup({ ...createDefaultDoc(), shapes: [line] })
+  const subpath = line.subpaths[0]
+  store.setUi({ activeTool: 'select', mode, snapEnabled: false })
+  store.setSelection({
+    shapeIds: [line.id],
+    nodes:
+      mode === 'node'
+        ? [{ shapeId: line.id, subpathId: subpath.id, nodeId: subpath.nodes[0].id }]
+        : [],
+  })
+  const xs = () => store.getState().doc.shapes[0].subpaths[0].nodes.map((node) => node.p.x)
+  return { store, press, xs }
+}
+
+describe.each(['shape', 'node'] as const)('%s nudge shortcuts', (mode) => {
+  it.each([
+    [0.25, 2],
+    [0.5, 4],
+    [1, 8],
+  ] as const)(
+    'uses %s normally and %s with Shift, including repeat and undo',
+    (snapIncrement, step) => {
+      const { store, press, xs } = setupNudge(mode)
+      store.setUi({ snapIncrement })
+      const positions = (dx: number) => [2 + dx, mode === 'shape' ? 12 + dx : 12]
+
+      expect(press('ArrowRight', {})).toBe(true)
+      expect(xs()).toEqual(positions(snapIncrement))
+      expect(press('ArrowRight', { shiftKey: true })).toBe(true)
+      expect(xs()).toEqual(positions(snapIncrement + step))
+      expect(press('ArrowRight', { shiftKey: true, repeat: true })).toBe(true)
+      expect(xs()).toEqual(positions(snapIncrement + 2 * step))
+      for (const dx of [snapIncrement + step, snapIncrement, 0]) {
+        store.undo()
+        expect(xs()).toEqual(positions(dx))
+      }
+    },
+  )
+
+  it('does not nudge during an open gesture', () => {
+    const { store, press, xs } = setupNudge(mode)
+    store.begin('Gesture')
+    const { tx, history } = store.getState()
+    expect(press('ArrowRight', {})).toBe(false)
+    expect(press('ArrowRight', { shiftKey: true })).toBe(false)
+    expect(store.getState().tx).toBe(tx)
+    expect(store.getState().history).toBe(history)
+    expect(xs()).toEqual([2, 12])
   })
 })
