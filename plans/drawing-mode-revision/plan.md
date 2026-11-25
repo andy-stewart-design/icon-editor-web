@@ -79,11 +79,11 @@ Expected files:
 
 Tasks:
 
-- [ ] Retain Shape Pen's creation and gesture behavior. For Node Pen, require one selected shape at start, pin the destination, and resolve an open endpoint or start a disconnected contour. Keep subsequent points in that contour; do not join to other contours. Expose eligible endpoint and resume feedback using the same resolver as press.
-- [ ] Preserve snapping, corner/curve drawing, closure for fresh contours, and existing finish/cancel behavior. Use the geometry helper for endpoint resumption and opposite-end closure. Drop only the pending press on pointer cancel; finish keys and deactivation commit placed points at most once.
-- [ ] Commit only the target contour or append a subpath in place. Preserve shape identity, style, stacking order, and unrelated geometry; reselect the pinned shape on success. Check its current geometry before dispatch; removal or changed geometry, a short new contour, or untouched resumption must not dispatch or consume a redo branch.
-- [ ] Add real-store tests for Shape Pen over an existing endpoint, curved head/tail extension, disconnected and closed SVG contours, ineligible starts and targets, selection changing from A to B, stale/no-op paths, finish/cancel cases, and one Undo/Redo per successful finish. Assert actual serializer output and exercise a non-identity snap for new points.
-- [ ] Satisfy the verification and completion gate below, and record concise evidence.
+- [x] Retain Shape Pen's creation and gesture behavior. For Node Pen, require one selected shape at start, pin the destination, and resolve an open endpoint or start a disconnected contour. Keep subsequent points in that contour; do not join to other contours. Expose eligible endpoint and resume feedback using the same resolver as press.
+- [x] Preserve snapping, corner/curve drawing, closure for fresh contours, and existing finish/cancel behavior. Use the geometry helper for endpoint resumption and opposite-end closure. Drop only the pending press on pointer cancel; finish keys and deactivation commit placed points at most once.
+- [x] Commit only the target contour or append a subpath in place. Preserve shape identity, style, stacking order, and unrelated geometry; reselect the pinned shape on success. Check its current geometry before dispatch; removal or changed geometry, a short new contour, or untouched resumption must not dispatch or consume a redo branch.
+- [x] Add real-store tests for Shape Pen over an existing endpoint, curved head/tail extension, disconnected and closed SVG contours, ineligible starts and targets, selection changing from A to B, stale/no-op paths, finish/cancel cases, and one Undo/Redo per successful finish. Assert actual serializer output and exercise a non-identity snap for new points.
+- [x] Satisfy the verification and completion gate below, and record concise evidence.
 
 Verification:
 

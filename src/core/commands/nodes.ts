@@ -261,3 +261,22 @@ export function nodePanelState(doc: IconDoc, sel: Selection): NodePanelState | n
     mode: modes.every((m) => m === modes[0]) ? modes[0] : 'mixed',
   }
 }
+
+// Build the edit only while the pinned geometry is current. The store uses immutable snapshots;
+// comparing the subpaths reference allows unrelated changes (including style) to survive.
+export function drawContour(doc: IconDoc, pinned: PathShape, next: Subpath, previous?: Subpath): Command | null {
+  const target = doc.shapes.find((s) => s.id === pinned.id)
+  if (!target || target.subpaths !== pinned.subpaths || next === previous) return null
+  const index = previous ? target.subpaths.indexOf(previous) : -1
+  if (previous && index < 0) return null
+  return {
+    label: 'Draw contour',
+    recipe: (draft) => {
+      const shape = draft.shapes.find((s) => s.id === pinned.id)
+      if (!shape) return
+      if (index < 0) shape.subpaths.push(next)
+      else shape.subpaths[index] = next
+    },
+    selectionAfter: { shapeIds: [pinned.id], nodes: [] },
+  }
+}

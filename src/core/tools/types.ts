@@ -1,6 +1,7 @@
 import type { Command } from '../commands'
 import type { Rect } from '../geometry/bounds'
-import type { PathShape, Pt } from '../model'
+import type { Selection } from '../history'
+import type { IconDoc, PathShape, Pt } from '../model'
 import type { SnapResult } from '../snap'
 
 // Built by the host for each pointer event (see buildSnapFn). It already honors suspendSnap.
@@ -28,12 +29,18 @@ export type OverlayPrimitive =
   | { kind: 'nodeHover'; p: Pt } // Node tool: ring on the anchor or handle under the pointer (no gesture active)
   | { kind: 'segmentOutline'; from: Pt; c1: Pt; c2: Pt; to: Pt } // Node tool: every segment of the selected shapes, as a cubic, drawn as a neutral centerline
   | { kind: 'segmentHover'; from: Pt; c1: Pt; c2: Pt; to: Pt } // Node tool: the segment under the pointer, as a cubic (c1 = from and c2 = to when straight)
+  | { kind: 'penEndpoint'; p: Pt } // Node Pen: eligible open endpoint
+  | { kind: 'penResume'; p: Pt } // Node Pen: endpoint the next press would resume
   | { kind: 'closeTarget'; p: Pt } // Pen tool: ring on the first node while a click would close the path
 
 // The store satisfies this structurally. Each tool commit is one dispatch, so it is one history entry.
 export type ToolHost = {
   dispatch: (command: Command) => void
 }
+
+export type PenContext =
+  | { mode: 'shape' }
+  | { mode: 'node'; getState: () => { doc: IconDoc; selection: Selection } }
 
 export interface Tool {
   readonly cursor: string
