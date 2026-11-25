@@ -90,7 +90,9 @@ describe('style overrides (AC30)', () => {
     b.style = { linecap: 'round' }
     const { store, select } = setup([a, b])
     select(a.id, b.id)
-    expect(selectionField(store.getState().doc, store.getState().selection, 'linecap')).toEqual({ kind: 'mixed' })
+    expect(selectionField(store.getState().doc, store.getState().selection, 'linecap')).toEqual({
+      kind: 'mixed',
+    })
 
     store.dispatch(setLinecapOverride(store.getState().selection, 'butt'))
     const doc = store.getState().doc
@@ -113,7 +115,11 @@ describe('style overrides (AC30)', () => {
     select(a.id)
     const sel = store.getState().selection
     const doc = store.getState().doc
-    expect(selectionField(doc, sel, 'strokeWidth')).toEqual({ kind: 'same', value: 1.5, overridden: false })
+    expect(selectionField(doc, sel, 'strokeWidth')).toEqual({
+      kind: 'same',
+      value: 1.5,
+      overridden: false,
+    })
     store.dispatch(setStrokeWidthOverride(sel, 2))
     expect(selectionField(store.getState().doc, sel, 'strokeWidth')).toEqual({
       kind: 'same',

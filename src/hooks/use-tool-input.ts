@@ -1,4 +1,13 @@
-import { useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState, type PointerEvent as ReactPointerEvent, type MouseEvent as ReactMouseEvent } from 'react'
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+  type MouseEvent as ReactMouseEvent,
+} from 'react'
 import {
   buildSnapFn,
   createEllipseTool,
@@ -57,7 +66,11 @@ function releaseGesture(ref: { current: Gesture | null }): void {
   if (g.el.hasPointerCapture(g.id)) g.el.releasePointerCapture(g.id)
 }
 
-function createTool(store: EditorStore, context: ReturnType<typeof toolContext>, rectRadius: number): Tool {
+function createTool(
+  store: EditorStore,
+  context: ReturnType<typeof toolContext>,
+  rectRadius: number,
+): Tool {
   switch (context) {
     case 'line':
       return createLineTool(store)
@@ -134,7 +147,10 @@ export function useToolInput(): ToolInput {
     const unsubscribe = store.subscribe(() => {
       if (switching) return
       const next = store.getState()
-      if (toolContext(next.ui) !== context || (context === 'rect' && next.ui.rectRadius !== radius)) {
+      if (
+        toolContext(next.ui) !== context ||
+        (context === 'rect' && next.ui.rectRadius !== radius)
+      ) {
         switching = true
         try {
           retire()
@@ -144,8 +160,11 @@ export function useToolInput(): ToolInput {
         }
         return
       }
-      const refresh = next.doc !== previous.doc || next.selection !== previous.selection ||
-        next.ui.viewport !== previous.ui.viewport || next.ui.snapEnabled !== previous.ui.snapEnabled ||
+      const refresh =
+        next.doc !== previous.doc ||
+        next.selection !== previous.selection ||
+        next.ui.viewport !== previous.ui.viewport ||
+        next.ui.snapEnabled !== previous.ui.snapEnabled ||
         next.ui.snapIncrement !== previous.ui.snapIncrement
       previous = next
       if (!refresh || gestureRef.current) return
@@ -169,7 +188,8 @@ export function useToolInput(): ToolInput {
     window.addEventListener(
       'keydown',
       (e) => {
-        if (isSpace(e) && !(e.metaKey || e.ctrlKey) && !isEditable(e.target)) spaceRef.current = true
+        if (isSpace(e) && !(e.metaKey || e.ctrlKey) && !isEditable(e.target))
+          spaceRef.current = true
       },
       { signal },
     )
@@ -195,7 +215,14 @@ export function useToolInput(): ToolInput {
     return {
       onDoubleClick(e) {
         const { ui, tx } = store.getState()
-        if (e.button !== 0 || gestureRef.current || tx || !isNodeSelect(ui) || e.currentTarget.dataset.pan) return
+        if (
+          e.button !== 0 ||
+          gestureRef.current ||
+          tx ||
+          !isNodeSelect(ui) ||
+          e.currentTarget.dataset.pan
+        )
+          return
         const tool = toolRef.current
         if (!tool?.doubleClick || !ui.canvasSize.width || !ui.canvasSize.height) return
         tool.doubleClick(toolEvent(store, localOf(e), e, spaceRef.current))

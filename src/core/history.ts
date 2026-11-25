@@ -7,8 +7,13 @@ export type NodeRef = { shapeId: string; subpathId: string; nodeId: string }
 export type SegmentRef = { shapeId: string; subpathId: string; fromId: string; toId: string }
 export type Selection = { shapeIds: string[]; nodes: NodeRef[]; segment?: SegmentRef }
 
-export function resolveSegment(doc: IconDoc, ref: SegmentRef): { subpath: Subpath; segment: Segment } | undefined {
-  const subpath = doc.shapes.find((s) => s.id === ref.shapeId)?.subpaths.find((sp) => sp.id === ref.subpathId)
+export function resolveSegment(
+  doc: IconDoc,
+  ref: SegmentRef,
+): { subpath: Subpath; segment: Segment } | undefined {
+  const subpath = doc.shapes
+    .find((s) => s.id === ref.shapeId)
+    ?.subpaths.find((sp) => sp.id === ref.subpathId)
   if (!subpath || subpath.nodes.length < 2) return
   const { nodes, closed } = subpath
   const i = nodes.findIndex((n) => n.id === ref.fromId)
@@ -20,7 +25,6 @@ export function resolveSegment(doc: IconDoc, ref: SegmentRef): { subpath: Subpat
 export function withoutSegment(sel: Selection): Selection {
   return sel.segment ? { shapeIds: sel.shapeIds, nodes: sel.nodes } : sel
 }
-
 
 export const emptySelection: Selection = { shapeIds: [], nodes: [] }
 
@@ -49,7 +53,12 @@ export function pruneSelection(sel: Selection, doc: IconDoc): Selection {
     shapeIds: sel.shapeIds.filter((id) => shapes.has(id)),
     nodes: sel.nodes.filter(hasNode),
   }
-  if (sel.segment && !sel.nodes.length && next.shapeIds.includes(sel.segment.shapeId) && resolveSegment(doc, sel.segment)) {
+  if (
+    sel.segment &&
+    !sel.nodes.length &&
+    next.shapeIds.includes(sel.segment.shapeId) &&
+    resolveSegment(doc, sel.segment)
+  ) {
     next.segment = { ...sel.segment }
   }
   return next
@@ -68,7 +77,9 @@ export function stepBack(h: HistoryState): { history: HistoryState; entry: Histo
   return { history: { past: h.past.slice(0, -1), future: [entry, ...h.future] }, entry }
 }
 
-export function stepForward(h: HistoryState): { history: HistoryState; entry: HistoryEntry } | null {
+export function stepForward(
+  h: HistoryState,
+): { history: HistoryState; entry: HistoryEntry } | null {
   const entry = h.future[0]
   if (!entry) return null
   return { history: { past: [...h.past, entry], future: h.future.slice(1) }, entry }

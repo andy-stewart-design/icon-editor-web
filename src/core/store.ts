@@ -1,6 +1,13 @@
 import { createStore } from 'zustand/vanilla'
 import { createCommands, type Command, type Recipe } from './commands'
-import { emptyHistory, emptySelection, pruneSelection, withoutSegment, type HistoryState, type Selection } from './history'
+import {
+  emptyHistory,
+  emptySelection,
+  pruneSelection,
+  withoutSegment,
+  type HistoryState,
+  type Selection,
+} from './history'
 import type { ResizeMode } from './commands/document'
 import type { IconDoc } from './model'
 import type { LoadResult, SaveStatus } from './persistence'
@@ -58,7 +65,7 @@ export const isNodeSelect = (ui: Pick<UiState, 'mode' | 'activeTool'>): boolean 
 
 // Routing includes the mode for Select and Pen, but primitives have only a Shape context.
 export const toolContext = ({ mode, activeTool }: Pick<UiState, 'mode' | 'activeTool'>) =>
-  activeTool === 'select' || activeTool === 'pen' ? `${mode}-${activeTool}` as const : activeTool
+  activeTool === 'select' || activeTool === 'pen' ? (`${mode}-${activeTool}` as const) : activeTool
 
 function updateUi(ui: UiState, patch: Partial<UiState>): UiState {
   const next = { ...ui, ...patch }
@@ -107,12 +114,17 @@ export function createEditorStore(initialDoc: IconDoc): EditorStore {
     getState: api.getState,
     subscribe: api.subscribe,
     setSelection: (selection) => {
-      api.setState({ selection: selection.segment ? selectionFor(selection, api.getState().doc) : selection })
+      api.setState({
+        selection: selection.segment ? selectionFor(selection, api.getState().doc) : selection,
+      })
     },
     setUi: (patch) => {
       const { ui, selection } = api.getState()
       const next = updateUi(ui, patch)
-      api.setState({ ui: next, selection: isNodeSelect(next) ? selection : withoutSegment(selection) })
+      api.setState({
+        ui: next,
+        selection: isNodeSelect(next) ? selection : withoutSegment(selection),
+      })
     },
     ...commands,
     subscribeCommitted: (listener) => {

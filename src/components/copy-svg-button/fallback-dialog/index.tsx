@@ -50,8 +50,17 @@ export default function FallbackDialog({ markup, onClose }: Props) {
       <h2 id="copy-svg-fallback-title" className={s.title}>
         Copy the SVG manually
       </h2>
-      <p className={s.hint}>Your browser blocked clipboard access. Select the markup below and copy it.</p>
-      <textarea ref={area} className={s.text} value={markup} readOnly spellCheck={false} onFocus={(e) => e.currentTarget.select()} />
+      <p className={s.hint}>
+        Your browser blocked clipboard access. Select the markup below and copy it.
+      </p>
+      <textarea
+        ref={area}
+        className={s.text}
+        value={markup}
+        readOnly
+        spellCheck={false}
+        onFocus={(e) => e.currentTarget.select()}
+      />
       <div className={s.actions}>
         <button type="button" className={s.button} onClick={close}>
           Close

@@ -1,4 +1,10 @@
-import { docToScreen, shapeAttributes, type IconDoc, type OverlayPrimitive, type PathShape } from '../../../core'
+import {
+  docToScreen,
+  shapeAttributes,
+  type IconDoc,
+  type OverlayPrimitive,
+  type PathShape,
+} from '../../../core'
 import { useEditor } from '../../../hooks/use-editor'
 import s from './styles.module.css'
 
@@ -88,11 +94,21 @@ export default function ToolOverlay({ primitives }: { primitives: OverlayPrimiti
         if (p.kind === 'penEndpoint' || p.kind === 'penResume') {
           const c = docToScreen(vp, p.p)
           const resume = p.kind === 'penResume'
-          return <circle key={i} className={resume ? s.penResume : s.penEndpoint} cx={c.x} cy={c.y} r={resume ? 8 : 4} />
+          return (
+            <circle
+              key={i}
+              className={resume ? s.penResume : s.penEndpoint}
+              cx={c.x}
+              cy={c.y}
+              r={resume ? 8 : 4}
+            />
+          )
         }
         if (p.kind === 'closeTarget') {
           const c = docToScreen(vp, p.p)
-          return <circle key={i} className={s.closeTarget} cx={c.x} cy={c.y} r={CLOSE_RING_RADIUS} />
+          return (
+            <circle key={i} className={s.closeTarget} cx={c.x} cy={c.y} r={CLOSE_RING_RADIUS} />
+          )
         }
         if (p.kind === 'snapLine') {
           if (p.axis === 'x') {
@@ -113,7 +129,16 @@ export default function ToolOverlay({ primitives }: { primitives: OverlayPrimiti
         }
         if (p.kind === 'nodeHover') {
           const c = docToScreen(vp, p.p)
-          return <rect key={i} className={s.nodeHover} x={c.x - HOVER_RING_HALF} y={c.y - HOVER_RING_HALF} width={HOVER_RING_HALF * 2} height={HOVER_RING_HALF * 2} />
+          return (
+            <rect
+              key={i}
+              className={s.nodeHover}
+              x={c.x - HOVER_RING_HALF}
+              y={c.y - HOVER_RING_HALF}
+              width={HOVER_RING_HALF * 2}
+              height={HOVER_RING_HALF * 2}
+            />
+          )
         }
         if (p.kind === 'segmentHover') {
           const a = docToScreen(vp, p.from)

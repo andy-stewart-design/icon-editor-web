@@ -3,9 +3,20 @@ import { newId } from '../ids'
 import { resolveSegment, type NodeRef } from '../history'
 import { createDefaultDoc, type IconDoc, type PathNode, type PathShape, type Pt } from '../model'
 import { createEditorStore } from '../store'
-import { cutSelectedSegment, deleteSelectedNodes, nodePanelState, setNodePosition, setSelectedNodesMode } from './nodes'
+import {
+  cutSelectedSegment,
+  deleteSelectedNodes,
+  nodePanelState,
+  setNodePosition,
+  setSelectedNodesMode,
+} from './nodes'
 
-const n = (p: Pt, extra: Partial<PathNode> = {}): PathNode => ({ id: newId(), p, mode: 'corner', ...extra })
+const n = (p: Pt, extra: Partial<PathNode> = {}): PathNode => ({
+  id: newId(),
+  p,
+  mode: 'corner',
+  ...extra,
+})
 const shape = (nodes: PathNode[], closed = false): PathShape => ({
   id: newId(),
   type: 'path',
@@ -18,7 +29,8 @@ const refOf = (s: PathShape, node: PathNode): NodeRef => ({
   nodeId: node.id,
 })
 const docWith = (shapes: PathShape[]): IconDoc => ({ ...createDefaultDoc(), shapes })
-const nodesOf = (doc: IconDoc, s: PathShape) => doc.shapes.find((x) => x.id === s.id)!.subpaths[0].nodes
+const nodesOf = (doc: IconDoc, s: PathShape) =>
+  doc.shapes.find((x) => x.id === s.id)!.subpaths[0].nodes
 
 describe('node position (AC31)', () => {
   it('X = 5 moves the anchor and its handles follow by the same delta', () => {
@@ -38,7 +50,9 @@ describe('node position (AC31)', () => {
     const b = n({ x: 10, y: 6 })
     const s = shape([a, b])
     const store = createEditorStore(docWith([s]))
-    store.dispatch(setNodePosition({ shapeIds: [s.id], nodes: [refOf(s, a), refOf(s, b)] }, { x: 5 }))
+    store.dispatch(
+      setNodePosition({ shapeIds: [s.id], nodes: [refOf(s, a), refOf(s, b)] }, { x: 5 }),
+    )
     expect(nodesOf(store.getState().doc, s).map((x) => x.p)).toEqual([
       { x: 5, y: 2 },
       { x: 5, y: 6 },
@@ -60,9 +74,18 @@ describe('node mode commands', () => {
     const store = createEditorStore(docWith([s]))
     const sel = { shapeIds: [s.id], nodes: [refOf(s, a)] }
     store.dispatch(setSelectedNodesMode(sel, 'free'))
-    expect(nodesOf(store.getState().doc, s)[0]).toEqual({ id: a.id, p: { x: 2, y: 4 }, mode: 'corner', hOut: { x: 5, y: 4 } })
+    expect(nodesOf(store.getState().doc, s)[0]).toEqual({
+      id: a.id,
+      p: { x: 2, y: 4 },
+      mode: 'corner',
+      hOut: { x: 5, y: 4 },
+    })
     store.dispatch(setSelectedNodesMode(sel, 'straight'))
-    expect(nodesOf(store.getState().doc, s)[0]).toEqual({ id: a.id, p: { x: 2, y: 4 }, mode: 'corner' })
+    expect(nodesOf(store.getState().doc, s)[0]).toEqual({
+      id: a.id,
+      p: { x: 2, y: 4 },
+      mode: 'corner',
+    })
   })
 
   it('symmetric creates equal-length mirrored handles on a handle-less node; smooth creates collinear ones', () => {
@@ -83,7 +106,9 @@ describe('node mode commands', () => {
     expect(smooth.mode).toBe('smooth')
     expect(smooth.hIn).toBeDefined()
     expect(smooth.hOut).toBeDefined()
-    const cross = (smooth.hIn!.x - smooth.p.x) * (smooth.hOut!.y - smooth.p.y) - (smooth.hIn!.y - smooth.p.y) * (smooth.hOut!.x - smooth.p.x)
+    const cross =
+      (smooth.hIn!.x - smooth.p.x) * (smooth.hOut!.y - smooth.p.y) -
+      (smooth.hIn!.y - smooth.p.y) * (smooth.hOut!.x - smooth.p.x)
     expect(Math.abs(cross)).toBeLessThan(1e-9)
   })
 
@@ -131,20 +156,34 @@ describe('node panel state', () => {
     expect(nodePanelState(doc, sel(free))?.mode).toBe('free')
     expect(nodePanelState(doc, sel(smooth))?.mode).toBe('smooth')
     expect(nodePanelState(doc, sel(sym))?.mode).toBe('symmetric')
-    expect(nodePanelState(doc, sel(straight, free))).toEqual({ count: 2, x: 'mixed', y: 1, mode: 'mixed' })
-    expect(nodePanelState(doc, sel(straight, zeroHandle))).toEqual({ count: 2, x: 'mixed', y: 1, mode: 'straight' })
+    expect(nodePanelState(doc, sel(straight, free))).toEqual({
+      count: 2,
+      x: 'mixed',
+      y: 1,
+      mode: 'mixed',
+    })
+    expect(nodePanelState(doc, sel(straight, zeroHandle))).toEqual({
+      count: 2,
+      x: 'mixed',
+      y: 1,
+      mode: 'straight',
+    })
   })
 })
 
 describe('deleteSelectedNodes (AC22, R13)', () => {
-  const closed4 = (): PathShape => shape([n({ x: 0, y: 0 }), n({ x: 10, y: 0 }), n({ x: 10, y: 10 }), n({ x: 0, y: 10 })], true)
+  const closed4 = (): PathShape =>
+    shape([n({ x: 0, y: 0 }), n({ x: 10, y: 0 }), n({ x: 10, y: 10 }), n({ x: 0, y: 10 })], true)
 
   it("'break' leaves the path open; one history entry; one undo restores the doc exactly", () => {
     const s = closed4()
     const store = createEditorStore(docWith([s]))
     const before = JSON.stringify(store.getState().doc)
     const sp = s.subpaths[0]
-    store.setSelection({ shapeIds: [s.id], nodes: [{ shapeId: s.id, subpathId: sp.id, nodeId: sp.nodes[1].id }] })
+    store.setSelection({
+      shapeIds: [s.id],
+      nodes: [{ shapeId: s.id, subpathId: sp.id, nodeId: sp.nodes[1].id }],
+    })
 
     store.dispatch(deleteSelectedNodes(store.getState().selection, 'break'))
     const after = store.getState().doc.shapes[0].subpaths
@@ -162,7 +201,10 @@ describe('deleteSelectedNodes (AC22, R13)', () => {
     const s = closed4()
     const store = createEditorStore(docWith([s]))
     const sp = s.subpaths[0]
-    store.setSelection({ shapeIds: [s.id], nodes: [{ shapeId: s.id, subpathId: sp.id, nodeId: sp.nodes[1].id }] })
+    store.setSelection({
+      shapeIds: [s.id],
+      nodes: [{ shapeId: s.id, subpathId: sp.id, nodeId: sp.nodes[1].id }],
+    })
     store.dispatch(deleteSelectedNodes(store.getState().selection, 'join'))
     const out = store.getState().doc.shapes[0].subpaths[0]
     expect(out.closed).toBe(true)
@@ -201,15 +243,26 @@ describe('cut selected segment', () => {
   })
 
   it('prunes a ref when both endpoints survive but are no longer adjacent', () => {
-    const a = n({ x: 2, y: 5 }), b = n({ x: 10, y: 5 }), mid = n({ x: 6, y: 5 })
+    const a = n({ x: 2, y: 5 }),
+      b = n({ x: 10, y: 5 }),
+      mid = n({ x: 6, y: 5 })
     const s = shape([a, b])
     const store = createEditorStore(docWith([s]))
     store.setUi({ mode: 'node' })
-    const selection = { shapeIds: [s.id], nodes: [], segment: {
-      shapeId: s.id, subpathId: s.subpaths[0].id, fromId: a.id, toId: b.id,
-    } }
+    const selection = {
+      shapeIds: [s.id],
+      nodes: [],
+      segment: {
+        shapeId: s.id,
+        subpathId: s.subpaths[0].id,
+        fromId: a.id,
+        toId: b.id,
+      },
+    }
     store.setSelection(selection)
-    store.updateDoc('Insert between endpoints', (doc) => { doc.shapes[0].subpaths[0].nodes.splice(1, 0, mid) })
+    store.updateDoc('Insert between endpoints', (doc) => {
+      doc.shapes[0].subpaths[0].nodes.splice(1, 0, mid)
+    })
     const after = store.getState()
     expect(after.selection.segment).toBeUndefined()
     store.dispatch(cutSelectedSegment(selection))
@@ -226,9 +279,16 @@ describe('cut selected segment', () => {
     const store = createEditorStore(docWith([s]))
     store.setUi({ mode: 'node' })
     for (const sp of s.subpaths) {
-      store.setSelection({ shapeIds: [s.id], nodes: [], segment: {
-        shapeId: s.id, subpathId: sp.id, fromId: sp.nodes[0].id, toId: sp.nodes[1].id,
-      } })
+      store.setSelection({
+        shapeIds: [s.id],
+        nodes: [],
+        segment: {
+          shapeId: s.id,
+          subpathId: sp.id,
+          fromId: sp.nodes[0].id,
+          toId: sp.nodes[1].id,
+        },
+      })
       store.dispatch(cutSelectedSegment(store.getState().selection))
       if (sp !== extra) expect(store.getState().doc.shapes[0].subpaths[0]).toBe(extra)
     }

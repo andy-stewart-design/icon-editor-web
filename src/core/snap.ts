@@ -26,7 +26,8 @@ export type SnapTarget =
 // targets is null on both axes when snapping is disabled (the point is returned unchanged).
 export type SnapResult = { point: Pt; targets: { x: SnapTarget | null; y: SnapTarget | null } }
 
-const snapToGrid = (v: number, increment: number): number => Math.round(v / increment) * increment + 0 // + 0 turns -0 into 0
+const snapToGrid = (v: number, increment: number): number =>
+  Math.round(v / increment) * increment + 0 // + 0 turns -0 into 0
 
 function boundsLines(bounds: readonly Rect[]): SnapLine[] {
   const lines: SnapLine[] = []
@@ -72,7 +73,12 @@ export function snapPoint(pt: Pt, ctx: SnapContext): SnapResult {
   for (const line of lines) {
     const d = Math.abs(pt[line.axis] - line.value)
     if (d > ctx.tolerance) continue
-    offer(line.axis, d, line.value, { kind: 'line', source: line.source, axis: line.axis, value: line.value })
+    offer(line.axis, d, line.value, {
+      kind: 'line',
+      source: line.source,
+      axis: line.axis,
+      value: line.value,
+    })
   }
 
   const x = best.x

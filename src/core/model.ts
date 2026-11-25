@@ -89,7 +89,8 @@ function checkNode(v: unknown, where: string): void {
 
 function checkStyle(v: unknown, where: string): void {
   check(isObj(v), `${where}: expected object`)
-  if (v.strokeWidth !== undefined) check(isPosNum(v.strokeWidth), `${where}.strokeWidth: expected positive number`)
+  if (v.strokeWidth !== undefined)
+    check(isPosNum(v.strokeWidth), `${where}.strokeWidth: expected positive number`)
   if (v.linecap !== undefined) check(isLinecap(v.linecap), `${where}.linecap: invalid value`)
   if (v.linejoin !== undefined) check(isLinejoin(v.linejoin), `${where}.linejoin: invalid value`)
   if (v.fill !== undefined) check(v.fill === 'none', `${where}.fill: invalid value`)

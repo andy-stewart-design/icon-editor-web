@@ -13,7 +13,14 @@ type Targets = SnapResult['targets']
 
 // A pending first press carries its destination until release. Resuming and closing an existing
 // contour do not place or modify an anchor; other drags pull the outgoing handle after the dead zone.
-type Press = { start?: Destination; node: PathNode; closing: boolean; origin: Pt; dragged: boolean; handle: Pt | null }
+type Press = {
+  start?: Destination
+  node: PathNode
+  closing: boolean
+  origin: Pt
+  dragged: boolean
+  handle: Pt | null
+}
 
 // The node with its outgoing handle at `handle` and the incoming handle mirrored through the anchor. Null leaves it as is.
 function withHandle(node: PathNode, handle: Pt | null): PathNode {
@@ -51,7 +58,8 @@ export function createPenTool(host: ToolHost, context: PenContext = { mode: 'sha
   const selectedShape = (): PathShape | undefined => {
     if (context.mode !== 'node') return
     const { doc, selection } = context.getState()
-    if (selection.shapeIds.length === 1) return doc.shapes.find((s) => s.id === selection.shapeIds[0])
+    if (selection.shapeIds.length === 1)
+      return doc.shapes.find((s) => s.id === selection.shapeIds[0])
   }
 
   const closeAnchor = (): PathNode | undefined => {
@@ -81,14 +89,17 @@ export function createPenTool(host: ToolHost, context: PenContext = { mode: 'sha
     press = null
     resetHover()
     if (context.mode === 'shape') {
-      if (placed.length >= 2) host.dispatch(addShapeCommand('Draw path', committedPath(placed, closed)))
+      if (placed.length >= 2)
+        host.dispatch(addShapeCommand('Draw path', committedPath(placed, closed)))
       return
     }
     if (!pinned) return
     const endpoint = pinned.endpoint
     const contour: Subpath | undefined = endpoint
       ? extendPenContour(endpoint.subpath, endpoint.end, placed, closed)
-      : placed.length >= 2 ? { id: newId(), nodes: placed, closed } : undefined
+      : placed.length >= 2
+        ? { id: newId(), nodes: placed, closed }
+        : undefined
     if (!contour || contour === endpoint?.subpath) return
     const command = drawContour(context.getState().doc, pinned.shape, contour, endpoint?.subpath)
     if (command) host.dispatch(command)
@@ -105,7 +116,10 @@ export function createPenTool(host: ToolHost, context: PenContext = { mode: 'sha
   const move = (e: ToolEvent): void => {
     const p = press
     if (!p || p.start?.endpoint || (p.closing && destination?.endpoint)) return
-    if (!p.dragged && Math.hypot(e.pt.x - p.origin.x, e.pt.y - p.origin.y) * e.zoom >= DRAG_THRESHOLD_PX)
+    if (
+      !p.dragged &&
+      Math.hypot(e.pt.x - p.origin.x, e.pt.y - p.origin.y) * e.zoom >= DRAG_THRESHOLD_PX
+    )
       p.dragged = true
     if (!p.dragged) return
     const s = e.snap(e.pt)
@@ -125,7 +139,14 @@ export function createPenTool(host: ToolHost, context: PenContext = { mode: 'sha
         if (!shape) return
         start = { shape, endpoint: resolvePenEndpoint(shape, e.pt, e.zoom) }
         if (start.endpoint) {
-          press = { start, node: start.endpoint.node, closing: false, origin: e.pt, dragged: false, handle: null }
+          press = {
+            start,
+            node: start.endpoint.node,
+            closing: false,
+            origin: e.pt,
+            dragged: false,
+            handle: null,
+          }
           return
         }
       }
@@ -202,42 +223,58 @@ export function createPenTool(host: ToolHost, context: PenContext = { mode: 'sha
       const waitingForTarget = context.mode === 'node' && !destination && !press
       const idleShape = waitingForTarget ? selectedShape() : undefined
       if (waitingForTarget && !idleShape) return out
-      const resume = idleShape && lastHover && resolvePenEndpoint(idleShape, lastHover.pt, lastHover.zoom)
+      const resume =
+        idleShape && lastHover && resolvePenEndpoint(idleShape, lastHover.pt, lastHover.zoom)
       if (idleShape) {
         for (const subpath of idleShape.subpaths) {
           if (subpath.closed || !subpath.nodes.length) continue
           const head = subpath.nodes[0]
           out.push({ kind: 'penEndpoint', p: head.p })
-          if (subpath.nodes.length > 1) out.push({ kind: 'penEndpoint', p: subpath.nodes[subpath.nodes.length - 1].p })
+          if (subpath.nodes.length > 1)
+            out.push({ kind: 'penEndpoint', p: subpath.nodes[subpath.nodes.length - 1].p })
         }
         if (resume) out.push({ kind: 'penResume', p: resume.node.p })
       }
       const endpoint = destination?.endpoint ?? press?.start?.endpoint
       const closing = press?.closing === true
       const close = closeAnchor()
-      const pending = press && !closing && !press.start?.endpoint ? withHandle(press.node, press.handle) : null
+      const pending =
+        press && !closing && !press.start?.endpoint ? withHandle(press.node, press.handle) : null
       const first = closing && !endpoint ? withHandle(nodes[0], press?.handle ?? null) : null
       // Preview in drawing order, with just the new segments and their attachment anchors.
-      const inDrawingOrder = (n: PathNode): PathNode => endpoint?.end === 'head'
-        ? { ...n, hIn: n.hOut, hOut: n.hIn }
-        : n
-      const placed = endpoint ? [inDrawingOrder(endpoint.node), ...nodes] : first ? [first, ...nodes.slice(1)] : nodes
-      const trailing = (closing || hoverNearClose) && endpoint && close
-        ? inDrawingOrder(close)
-        : !press && rubber && placed.length > 0 ? { id: 'rubber', p: rubber, mode: 'corner' } as const : null
+      const inDrawingOrder = (n: PathNode): PathNode =>
+        endpoint?.end === 'head' ? { ...n, hIn: n.hOut, hOut: n.hIn } : n
+      const placed = endpoint
+        ? [inDrawingOrder(endpoint.node), ...nodes]
+        : first
+          ? [first, ...nodes.slice(1)]
+          : nodes
+      const trailing =
+        (closing || hoverNearClose) && endpoint && close
+          ? inDrawingOrder(close)
+          : !press && rubber && placed.length > 0
+            ? ({ id: 'rubber', p: rubber, mode: 'corner' } as const)
+            : null
       const preview = [...placed, ...(pending ? [pending] : []), ...(trailing ? [trailing] : [])]
-      if (preview.length >= 2) out.push({ kind: 'draft', shape: previewPath(preview, !endpoint && closing) })
+      if (preview.length >= 2)
+        out.push({ kind: 'draft', shape: previewPath(preview, !endpoint && closing) })
 
-      for (const n of [...placed, ...(pending ? [pending] : [])]) out.push({ kind: 'anchor', p: n.p })
+      for (const n of [...placed, ...(pending ? [pending] : [])])
+        out.push({ kind: 'anchor', p: n.p })
 
-      const handleNodes = [placed[placed.length - 1], pending && press?.dragged ? pending : null, first]
+      const handleNodes = [
+        placed[placed.length - 1],
+        pending && press?.dragged ? pending : null,
+        first,
+      ]
       for (const n of handleNodes) {
         if (!n) continue
         if (n.hIn) out.push({ kind: 'handle', from: n.p, to: n.hIn })
         if (n.hOut) out.push({ kind: 'handle', from: n.p, to: n.hOut })
       }
 
-      if (close && (closing || (!press && hoverNearClose))) out.push({ kind: 'closeTarget', p: close.p })
+      if (close && (closing || (!press && hoverNearClose)))
+        out.push({ kind: 'closeTarget', p: close.p })
       if (targets && !resume) out.push(...snapIndicator(targets))
       return out
     },

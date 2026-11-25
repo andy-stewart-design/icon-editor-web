@@ -12,7 +12,10 @@ export default function SelectionOutline() {
   const selection = useEditor((e) => e.selection)
   const vp = useEditor((e) => e.ui.viewport)
   const shown = showOutline && selection.shapeIds.length > 0
-  const prims = useMemo(() => (shown ? selectionOutline(doc, selection) : []), [shown, doc, selection])
+  const prims = useMemo(
+    () => (shown ? selectionOutline(doc, selection) : []),
+    [shown, doc, selection],
+  )
   if (prims.length === 0) return null
 
   return (
@@ -23,7 +26,13 @@ export default function SelectionOutline() {
         const c1 = docToScreen(vp, p.c1)
         const c2 = docToScreen(vp, p.c2)
         const b = docToScreen(vp, p.to)
-        return <path key={i} className={s.segmentOutline} d={`M${a.x} ${a.y}C${c1.x} ${c1.y} ${c2.x} ${c2.y} ${b.x} ${b.y}`} />
+        return (
+          <path
+            key={i}
+            className={s.segmentOutline}
+            d={`M${a.x} ${a.y}C${c1.x} ${c1.y} ${c2.x} ${c2.y} ${b.x} ${b.y}`}
+          />
+        )
       })}
     </svg>
   )

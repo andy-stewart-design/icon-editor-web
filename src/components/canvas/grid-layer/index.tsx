@@ -34,8 +34,12 @@ export default function GridLayer() {
   return (
     <svg className={s.layer} aria-hidden="true">
       <rect className={s.artboard} x={left} y={top} width={right - left} height={bottom - top} />
-      {showGrid && gridSpacingVisible(vp.zoom, 1) && <path className={s.grid} d={gridPath(vp, size, 1)} />}
-      {showSubgrid && gridSpacingVisible(vp.zoom, 0.5) && <path className={s.subgrid} d={gridPath(vp, size, 0.5)} />}
+      {showGrid && gridSpacingVisible(vp.zoom, 1) && (
+        <path className={s.grid} d={gridPath(vp, size, 1)} />
+      )}
+      {showSubgrid && gridSpacingVisible(vp.zoom, 0.5) && (
+        <path className={s.subgrid} d={gridPath(vp, size, 0.5)} />
+      )}
     </svg>
   )
 }

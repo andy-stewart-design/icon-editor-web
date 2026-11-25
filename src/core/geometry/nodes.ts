@@ -34,12 +34,17 @@ function withHandle(node: PathNode, key: 'hIn' | 'hOut', pt: Pt | undefined): Pa
 
 // Nearest point on the segment from a to b, with t in [0, 1]. Straight when neither handle is set,
 // otherwise a cubic (missing handles at their anchor), projected with bezier-js.
-export function projectToSegment(a: PathNode, b: PathNode, pt: Pt): { t: number; point: Pt; distance: number } {
+export function projectToSegment(
+  a: PathNode,
+  b: PathNode,
+  pt: Pt,
+): { t: number; point: Pt; distance: number } {
   const seg = segmentBetween(0, a, b)
   if (seg.straight) {
     const d = sub(b.p, a.p)
     const l2 = d.x * d.x + d.y * d.y
-    const t = l2 === 0 ? 0 : Math.min(1, Math.max(0, ((pt.x - a.p.x) * d.x + (pt.y - a.p.y) * d.y) / l2))
+    const t =
+      l2 === 0 ? 0 : Math.min(1, Math.max(0, ((pt.x - a.p.x) * d.x + (pt.y - a.p.y) * d.y) / l2))
     const point = add(a.p, scale(d, t))
     return { t, point, distance: dist(point, pt) }
   }
@@ -55,7 +60,13 @@ export function nearestSegment(shape: PathShape, pt: Pt): NearestSegment | null 
     for (const seg of segmentsOf(sp)) {
       const hit = projectToSegment(seg.from, seg.to, pt)
       if (!best || hit.distance < best.distance) {
-        best = { subpathIndex, segIndex: seg.index, t: hit.t, point: hit.point, distance: hit.distance }
+        best = {
+          subpathIndex,
+          segIndex: seg.index,
+          t: hit.t,
+          point: hit.point,
+          distance: hit.distance,
+        }
       }
     }
   })
@@ -159,18 +170,25 @@ export function breakAtNodes(shape: PathShape, nodeIds: ReadonlySet<string>): Pa
 // Cut one edge without moving any control point on the surviving edges.
 export function cutSegmentAt(sp: Subpath, index: number): Subpath[] {
   const { nodes, closed } = sp
-  if (nodes.length < 2 || !Number.isInteger(index) || index < 0 || index >= nodes.length - (closed ? 0 : 1)) {
+  if (
+    nodes.length < 2 ||
+    !Number.isInteger(index) ||
+    index < 0 ||
+    index >= nodes.length - (closed ? 0 : 1)
+  ) {
     return [sp]
   }
   const left = nodes.slice(0, index + 1)
   const right = nodes.slice(index + 1)
   const runs = closed ? [[...right, ...left]] : [left, right]
-  return runs.filter((run) => run.length >= 2).map((run, i) => {
-    run[0] = withHandle(run[0], 'hIn', undefined)
-    const last = run.length - 1
-    run[last] = withHandle(run[last], 'hOut', undefined)
-    return { id: i === 0 ? sp.id : newId(), closed: false, nodes: run }
-  })
+  return runs
+    .filter((run) => run.length >= 2)
+    .map((run, i) => {
+      run[0] = withHandle(run[0], 'hIn', undefined)
+      const last = run.length - 1
+      run[last] = withHandle(run[last], 'hOut', undefined)
+      return { id: i === 0 ? sp.id : newId(), closed: false, nodes: run }
+    })
 }
 
 // Maximal runs of surviving nodes, in path order. A closed subpath is scanned starting just after a removed node,
@@ -263,7 +281,11 @@ function alignNode(node: PathNode): PathNode {
   // symmetric
   const count = (la > 0 ? 1 : 0) + (lb > 0 ? 1 : 0)
   const L = (la + lb) / count
-  return withHandle(withHandle(node, 'hOut', add(node.p, scale(d, L))), 'hIn', sub(node.p, scale(d, L)))
+  return withHandle(
+    withHandle(node, 'hOut', add(node.p, scale(d, L))),
+    'hIn',
+    sub(node.p, scale(d, L)),
+  )
 }
 
 // Switches a node's mode on a node that already has handles. Corner only changes the mode. Smooth and
@@ -285,7 +307,12 @@ function hasHandle(node: PathNode): boolean {
 
 // Builds a handle-less node in the given mode, creating handles from its neighbours (see setNodeMode).
 // A neighbour is undefined when absent (open endpoint).
-function createHandles(node: PathNode, mode: NodeMode, prev: PathNode | undefined, next: PathNode | undefined): PathNode {
+function createHandles(
+  node: PathNode,
+  mode: NodeMode,
+  prev: PathNode | undefined,
+  next: PathNode | undefined,
+): PathNode {
   const out: PathNode = { id: node.id, p: node.p, mode }
   const p = node.p
   const dN = next ? dist(p, next.p) : 0

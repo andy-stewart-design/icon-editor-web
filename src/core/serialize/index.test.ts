@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { createDefaultDoc, type IconDoc, type PathNode, type PathShape, type Subpath } from '../model'
+import {
+  createDefaultDoc,
+  type IconDoc,
+  type PathNode,
+  type PathShape,
+  type Subpath,
+} from '../model'
 import { serializeDoc } from '.'
 
 const corner = (id: string, x: number, y: number): PathNode => ({ id, p: { x, y }, mode: 'corner' })
@@ -39,7 +45,9 @@ describe('serializeDoc', () => {
     const a = shape('a', [sub('spa', [corner('n1', 3.14159, -0.001), corner('n2', 1.005, 2)])])
     const b = shape('b', [sub('spb', [corner('n3', 0, 0), corner('n4', 1, 1)])], { strokeWidth: 2 })
     const out = serializeDoc(docWith([a, b]))
-    expect(out).toBe(`${ROOT_OPEN}\n  <path d="M3.14 0L1.01 2"/>\n  <path d="M0 0L1 1" stroke-width="2"/>\n</svg>`)
+    expect(out).toBe(
+      `${ROOT_OPEN}\n  <path d="M3.14 0L1.01 2"/>\n  <path d="M0 0L1 1" stroke-width="2"/>\n</svg>`,
+    )
     expect(out).not.toMatch(/-0(?![.\d])/)
     expect(out).not.toMatch(/\.\d{3,}/)
   })
@@ -58,11 +66,15 @@ describe('serializeDoc', () => {
 
   it('never emits transform, id, class or style attributes', () => {
     const doc = docWith([
-      shape('s1', [sub('sp1', [corner('n1', 1, 1), { ...corner('n2', 5, 5), hIn: { x: 4, y: 4 } }], true)], {
-        strokeWidth: 3,
-        linecap: 'square',
-        linejoin: 'bevel',
-      }),
+      shape(
+        's1',
+        [sub('sp1', [corner('n1', 1, 1), { ...corner('n2', 5, 5), hIn: { x: 4, y: 4 } }], true)],
+        {
+          strokeWidth: 3,
+          linecap: 'square',
+          linejoin: 'bevel',
+        },
+      ),
     ])
     expect(serializeDoc(doc)).not.toMatch(/transform|\bid=|class=|style=/)
   })

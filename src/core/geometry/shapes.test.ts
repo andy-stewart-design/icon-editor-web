@@ -23,7 +23,9 @@ describe('makeRect (AC14, AC15)', () => {
       { x: 2, y: 4 },
     ]
     for (const seg of segs.filter((s) => !s.straight)) {
-      const c = centres.find((k) => Math.abs(dist(seg.from.p, k) - 2) < 1e-9 && Math.abs(dist(seg.to.p, k) - 2) < 1e-9)
+      const c = centres.find(
+        (k) => Math.abs(dist(seg.from.p, k) - 2) < 1e-9 && Math.abs(dist(seg.to.p, k) - 2) < 1e-9,
+      )
       if (!c) throw new Error('arc has no matching centre')
       for (const p of sampleSegment(seg, 64)) {
         expect(Math.abs(dist(p, c) - 2)).toBeLessThan(0.002)

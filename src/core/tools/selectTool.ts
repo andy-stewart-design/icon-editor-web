@@ -1,4 +1,10 @@
-import { resizeFactors, resizeRecipe, rotateRecipe, rotationAngle, type HandleId } from '../commands/transform'
+import {
+  resizeFactors,
+  resizeRecipe,
+  rotateRecipe,
+  rotationAngle,
+  type HandleId,
+} from '../commands/transform'
 import { translateRecipe } from '../commands/selection'
 import type { Recipe } from '../commands'
 import type { Selection } from '../history'
@@ -77,7 +83,13 @@ type Move = {
 }
 
 // Dragging a resize handle. The bounds at press stay the reference, so each update rebuilds from the base doc.
-type Resize = { kind: 'resize'; handle: HandleId; bounds: Rect; ids: string[]; indicator: OverlayPrimitive[] }
+type Resize = {
+  kind: 'resize'
+  handle: HandleId
+  bounds: Rect
+  ids: string[]
+  indicator: OverlayPrimitive[]
+}
 
 // Dragging the rotate handle. The angle is measured from the pointer at press around the bounds center.
 type Rotate = { kind: 'rotate'; center: Pt; start: Pt; ids: string[] }
@@ -143,7 +155,11 @@ export function createSelectTool(host: SelectHost): SelectTool {
 
   // A press only becomes a move once the pointer leaves the dead zone. After that the shape follows the full offset.
   const pressMove = (e: ToolEvent, m: Move): void => {
-    if (!m.dragged && Math.hypot(e.pt.x - m.start.x, e.pt.y - m.start.y) * e.zoom >= DRAG_THRESHOLD_PX) m.dragged = true
+    if (
+      !m.dragged &&
+      Math.hypot(e.pt.x - m.start.x, e.pt.y - m.start.y) * e.zoom >= DRAG_THRESHOLD_PX
+    )
+      m.dragged = true
     if (m.dragged) moveTo(m, e)
   }
 
@@ -167,7 +183,12 @@ export function createSelectTool(host: SelectHost): SelectTool {
         const ids = [...selection.shapeIds]
         if (grabbed === 'rotate') {
           host.begin('Rotate')
-          mode = { kind: 'rotate', center: { x: selBounds.x + selBounds.w / 2, y: selBounds.y + selBounds.h / 2 }, start: e.pt, ids }
+          mode = {
+            kind: 'rotate',
+            center: { x: selBounds.x + selBounds.w / 2, y: selBounds.y + selBounds.h / 2 },
+            start: e.pt,
+            ids,
+          }
         } else {
           host.begin('Resize')
           mode = { kind: 'resize', handle: grabbed, bounds: selBounds, ids, indicator: [] }

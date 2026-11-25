@@ -26,7 +26,12 @@ describe('scaling (AC24)', () => {
     const out = scaleAbout(shape, 2, 2, { x: 0, y: 0 })
     expect(out.style).toEqual({ strokeWidth: 2 })
     const before = allPoints(shape)
-    expect(maxDiff(allPoints(out), before.map((p) => ({ x: p.x * 2, y: p.y * 2 })))).toBeLessThan(1e-9)
+    expect(
+      maxDiff(
+        allPoints(out),
+        before.map((p) => ({ x: p.x * 2, y: p.y * 2 })),
+      ),
+    ).toBeLessThan(1e-9)
   })
 })
 
@@ -43,7 +48,7 @@ describe('rotation', () => {
   it('rotating by an angle and back returns the original geometry within 1e-9', () => {
     const shape = sample()
     const origin = { x: 7, y: 6 }
-    const theta = (15 * Math.PI) / 180 * 3
+    const theta = ((15 * Math.PI) / 180) * 3
     const out = rotateAbout(rotateAbout(shape, theta, origin), -theta, origin)
     expect(maxDiff(allPoints(out), allPoints(shape))).toBeLessThan(1e-9)
   })
@@ -67,7 +72,7 @@ describe('scaleDoc (artboard resize)', () => {
     expect(out.strokeWidth).toBe(1.5)
     expect(out.shapes[0].style).toEqual({ strokeWidth: 3 })
     const [a, b] = out.shapes[0].subpaths[0].nodes
-    expect(a.p.x).toBeCloseTo(2 * 32 / 24, 12)
-    expect(b.p.x).toBeCloseTo(22 * 32 / 24, 12)
+    expect(a.p.x).toBeCloseTo((2 * 32) / 24, 12)
+    expect(b.p.x).toBeCloseTo((22 * 32) / 24, 12)
   })
 })

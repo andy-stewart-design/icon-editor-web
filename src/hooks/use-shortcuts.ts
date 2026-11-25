@@ -50,8 +50,7 @@ const ACTIVATABLE_TAGS = new Set(['BUTTON', 'A', 'SELECT'])
 const isActivatable = (target: EventTarget | null): boolean =>
   target instanceof HTMLElement && ACTIVATABLE_TAGS.has(target.tagName)
 const enterToggles = (s: Context, e: KeyboardEvent): boolean =>
-  !isActivatable(e.target) &&
-  s.ui.activeTool === 'select' && (s.ui.mode === 'node' || hasShapes(s))
+  !isActivatable(e.target) && s.ui.activeTool === 'select' && (s.ui.mode === 'node' || hasShapes(s))
 
 const tool = (key: string, activeTool: ActiveTool, shift: Shift = 'any'): Binding => ({
   keys: [key],
@@ -62,7 +61,8 @@ const tool = (key: string, activeTool: ActiveTool, shift: Shift = 'any'): Bindin
 
 // Nudge step: the snap increment, or 1 unit with Shift. `nodes` picks the Node tool's node nudge over shape nudge.
 const nudge = (dir: NudgeDir, nodes: boolean): Binding['run'] => {
-  const [ux, uy] = dir === 'left' ? [-1, 0] : dir === 'right' ? [1, 0] : dir === 'up' ? [0, -1] : [0, 1]
+  const [ux, uy] =
+    dir === 'left' ? [-1, 0] : dir === 'right' ? [1, 0] : dir === 'up' ? [0, -1] : [0, 1]
   return (store, e) => {
     const { selection, ui } = store.getState()
     const step = nudgeAmount(ui.snapIncrement, e.shiftKey)
@@ -82,7 +82,12 @@ const flip = (axis: 'h' | 'v'): Binding => ({
 const BINDINGS: readonly Binding[] = [
   // Tools. Shift+V is flip when shapes are selected; without a selection it does nothing, as before.
   tool('v', 'select', 'none'),
-  { keys: ['a'], shift: 'any', repeat: false, run: (store) => store.setUi({ mode: 'node', activeTool: 'select' }) },
+  {
+    keys: ['a'],
+    shift: 'any',
+    repeat: false,
+    run: (store) => store.setUi({ mode: 'node', activeTool: 'select' }),
+  },
   tool('p', 'pen'),
   tool('l', 'line'),
   tool('r', 'rect'),
@@ -166,7 +171,13 @@ const BINDINGS: readonly Binding[] = [
 
   // Nudge. Node-tool nudging comes first so it wins over shape nudging when nodes are selected.
   { keys: ['arrowleft'], shift: 'any', when: nodeContext, repeat: true, run: nudge('left', true) },
-  { keys: ['arrowright'], shift: 'any', when: nodeContext, repeat: true, run: nudge('right', true) },
+  {
+    keys: ['arrowright'],
+    shift: 'any',
+    when: nodeContext,
+    repeat: true,
+    run: nudge('right', true),
+  },
   { keys: ['arrowup'], shift: 'any', when: nodeContext, repeat: true, run: nudge('up', true) },
   { keys: ['arrowdown'], shift: 'any', when: nodeContext, repeat: true, run: nudge('down', true) },
   { keys: ['arrowleft'], shift: 'any', when: hasShapes, repeat: true, run: nudge('left', false) },
@@ -227,7 +238,12 @@ function dispatchKey(store: EditorStore, e: KeyboardEvent, segmentDeletes: Set<s
     e.preventDefault()
     if (e.repeat && !b.repeat) return
     // Once this physical press cuts a segment, its repeats must never delete the owner.
-    if (!cmd && (key === 'delete' || key === 'backspace') && isNodeSelect(state.ui) && state.selection.segment) {
+    if (
+      !cmd &&
+      (key === 'delete' || key === 'backspace') &&
+      isNodeSelect(state.ui) &&
+      state.selection.segment
+    ) {
       segmentDeletes.add(key)
     }
     b.run(store, e)
@@ -242,7 +258,9 @@ export function useShortcuts(): void {
   useEffect(() => {
     const controller = new AbortController()
     const segmentDeletes = new Set<string>()
-    window.addEventListener('keydown', (e) => dispatchKey(store, e, segmentDeletes), { signal: controller.signal })
+    window.addEventListener('keydown', (e) => dispatchKey(store, e, segmentDeletes), {
+      signal: controller.signal,
+    })
     return () => controller.abort()
   }, [store])
 }

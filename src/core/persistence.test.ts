@@ -99,7 +99,11 @@ describe('createAutosave', () => {
     const kv = new MemoryKV()
     const timer = manualTimer()
     const statuses: SaveStatus[] = []
-    const autosave = createAutosave({ kv, schedule: timer.schedule, onStatus: (s) => statuses.push(s) })
+    const autosave = createAutosave({
+      kv,
+      schedule: timer.schedule,
+      onStatus: (s) => statuses.push(s),
+    })
 
     kv.failSet = true
     autosave.request(docWith('a'))

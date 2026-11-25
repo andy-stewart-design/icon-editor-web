@@ -30,7 +30,12 @@ export function translateRecipe(shapeIds: readonly string[], dx: number, dy: num
 }
 
 // Translates the selected shapes. The selection itself is kept.
-export function translateSelection(sel: Selection, dx: number, dy: number, label = 'Move'): Command {
+export function translateSelection(
+  sel: Selection,
+  dx: number,
+  dy: number,
+  label = 'Move',
+): Command {
   return { label, recipe: translateRecipe(sel.shapeIds, dx, dy), selectionAfter: sel }
 }
 
@@ -49,7 +54,12 @@ const DIR: Record<NudgeDir, [number, number]> = {
 }
 
 // One arrow press is one command, so each press is its own history entry.
-export function nudgeSelection(sel: Selection, dir: NudgeDir, increment: number, shift: boolean): Command {
+export function nudgeSelection(
+  sel: Selection,
+  dir: NudgeDir,
+  increment: number,
+  shift: boolean,
+): Command {
   const step = nudgeAmount(increment, shift)
   const [ux, uy] = DIR[dir]
   return translateSelection(sel, ux * step, uy * step, 'Nudge')

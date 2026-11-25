@@ -63,7 +63,12 @@ export function makeRect(x: number, y: number, w: number, h: number, r = 0): Pat
 
   let raws: Raw[]
   if (rad === 0) {
-    raws = [{ p: { x: x0, y: y0 } }, { p: { x: x1, y: y0 } }, { p: { x: x1, y: y1 } }, { p: { x: x0, y: y1 } }]
+    raws = [
+      { p: { x: x0, y: y0 } },
+      { p: { x: x1, y: y0 } },
+      { p: { x: x1, y: y1 } },
+      { p: { x: x0, y: y1 } },
+    ]
   } else {
     const k = KAPPA * rad
     // Clockwise in document space (y down), starting at the top edge after the top-left corner.

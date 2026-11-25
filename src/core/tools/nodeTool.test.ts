@@ -21,14 +21,23 @@ const ev = (x: number, y: number, o: Partial<ToolEvent> = {}): ToolEvent => ({
   ...o,
 })
 
-const n = (p: Pt, extra: Partial<PathNode> = {}): PathNode => ({ id: newId(), p, mode: 'corner', ...extra })
+const n = (p: Pt, extra: Partial<PathNode> = {}): PathNode => ({
+  id: newId(),
+  p,
+  mode: 'corner',
+  ...extra,
+})
 const shape = (nodes: PathNode[], closed = false): PathShape => ({
   id: newId(),
   type: 'path',
   style: {},
   subpaths: [{ id: newId(), closed, nodes }],
 })
-const refOf = (s: PathShape, node: PathNode): NodeRef => ({ shapeId: s.id, subpathId: s.subpaths[0].id, nodeId: node.id })
+const refOf = (s: PathShape, node: PathNode): NodeRef => ({
+  shapeId: s.id,
+  subpathId: s.subpaths[0].id,
+  nodeId: node.id,
+})
 const docWith = (shapes: PathShape[]): IconDoc => ({ ...createDefaultDoc(), shapes })
 
 // Editor with snapping off, so pointer positions are exact, and a node tool on top of it.
@@ -41,7 +50,10 @@ function setup(shapes: PathShape[], sel: Selection) {
 }
 
 const nodeOf = (store: ReturnType<typeof createEditorStore>, s: PathShape, id: string) =>
-  store.getState().doc.shapes.find((x) => x.id === s.id)!.subpaths[0].nodes.find((x) => x.id === id)!
+  store
+    .getState()
+    .doc.shapes.find((x) => x.id === s.id)!
+    .subpaths[0].nodes.find((x) => x.id === id)!
 
 // Open cubic from (2, 20) to (22, 20) with both handles pulling up to y = 4.
 function curveShape(): PathShape {
@@ -64,11 +76,20 @@ describe('node tool: segment selection and insertion', () => {
     const picked = store.getState()
     expect(picked.doc).toBe(before.doc)
     expect(picked.history).toBe(before.history)
-    expect(picked.selection).toEqual({ shapeIds: [s.id], nodes: [], segment: {
-      shapeId: s.id, subpathId: s.subpaths[0].id, fromId: seg.from.id, toId: seg.to.id,
-    } })
+    expect(picked.selection).toEqual({
+      shapeIds: [s.id],
+      nodes: [],
+      segment: {
+        shapeId: s.id,
+        subpathId: s.subpaths[0].id,
+        fromId: seg.from.id,
+        toId: seg.to.id,
+      },
+    })
     tool.hover(ev(25, 25))
-    expect(nodeOverlay(picked.doc, picked.selection).some((p) => p.kind === 'segmentSelected')).toBe(true)
+    expect(
+      nodeOverlay(picked.doc, picked.selection).some((p) => p.kind === 'segmentSelected'),
+    ).toBe(true)
     tool.doubleClick(ev(mid.x, mid.y))
 
     const after = store.getState()
@@ -80,7 +101,9 @@ describe('node tool: segment selection and insertion', () => {
 
     // Every sampled point of the original curve lies on the new curve (checked against dense samples of both halves).
     const newSegs = segmentsOf(after.doc.shapes[0].subpaths[0])
-    const dense = newSegs.flatMap((sg) => Array.from({ length: 4001 }, (_, k) => evalSegment(sg, k / 4000)))
+    const dense = newSegs.flatMap((sg) =>
+      Array.from({ length: 4001 }, (_, k) => evalSegment(sg, k / 4000)),
+    )
     for (let i = 0; i <= 64; i++) {
       const p = evalSegment(seg, i / 64)
       const d = Math.min(...dense.map((q) => Math.hypot(q.x - p.x, q.y - p.y)))
@@ -92,7 +115,10 @@ describe('node tool: segment selection and insertion', () => {
 describe('node tool: handle drag (AC21)', () => {
   it('symmetric mirrors the opposite handle; smooth keeps its length; one entry per drag', () => {
     const endA = n({ x: 2, y: 12 })
-    const sym = n({ x: 12, y: 12 }, { mode: 'symmetric', hIn: { x: 9, y: 12 }, hOut: { x: 15, y: 12 } })
+    const sym = n(
+      { x: 12, y: 12 },
+      { mode: 'symmetric', hIn: { x: 9, y: 12 }, hOut: { x: 15, y: 12 } },
+    )
     const endB = n({ x: 22, y: 12 })
     const s = shape([endA, sym, endB])
     const { store, tool } = setup([s], { shapeIds: [s.id], nodes: [refOf(s, sym)] })
@@ -110,7 +136,10 @@ describe('node tool: handle drag (AC21)', () => {
 
   it('smooth keeps the opposite handle length and direction-opposed', () => {
     const endA = n({ x: 2, y: 12 })
-    const smooth = n({ x: 12, y: 12 }, { mode: 'smooth', hIn: { x: 9, y: 12 }, hOut: { x: 18, y: 12 } })
+    const smooth = n(
+      { x: 12, y: 12 },
+      { mode: 'smooth', hIn: { x: 9, y: 12 }, hOut: { x: 18, y: 12 } },
+    )
     const endB = n({ x: 22, y: 12 })
     const s = shape([endA, smooth, endB])
     const { store, tool } = setup([s], { shapeIds: [s.id], nodes: [refOf(s, smooth)] })
@@ -122,7 +151,7 @@ describe('node tool: handle drag (AC21)', () => {
     expect(out.hOut).toEqual({ x: 15, y: 6 })
     // The opposite handle keeps its length of 3 and points the other way.
     expect(Math.hypot(out.hIn!.x - 12, out.hIn!.y - 12)).toBeCloseTo(3)
-    expect(out.hIn!.x).toBeCloseTo(12 - (15 - 12) / Math.hypot(3, 6) * 3)
+    expect(out.hIn!.x).toBeCloseTo(12 - ((15 - 12) / Math.hypot(3, 6)) * 3)
     expect(out.hIn!.y).toBeCloseTo(12 + (6 / Math.hypot(3, 6)) * 3)
     expect(store.getState().history.past).toHaveLength(1)
   })
@@ -244,21 +273,29 @@ describe('node tool hit testing and overlay', () => {
     const s = shape([a, b])
     const doc = docWith([s])
     const sel = { shapeIds: [s.id], nodes: [] }
-    expect(hitNode(doc, { ...sel, nodes: [refOf(s, b)] }, { x: 16, y: 12 }, ZOOM)?.kind).toBe('handle')
+    expect(hitNode(doc, { ...sel, nodes: [refOf(s, b)] }, { x: 16, y: 12 }, ZOOM)?.kind).toBe(
+      'handle',
+    )
     // Not selected: the handle is not hit, and nothing is in reach there.
     expect(hitNode(doc, sel, { x: 16, y: 12 }, ZOOM)).toBeNull()
 
     const overlay = nodeOverlay(doc, { ...sel, nodes: [refOf(s, b)] })
     expect(overlay.filter((p) => p.kind === 'anchor')).toHaveLength(2)
-    expect(overlay.filter((p) => p.kind === 'handle')).toEqual([{ kind: 'handle', from: { x: 12, y: 12 }, to: { x: 16, y: 12 } }])
+    expect(overlay.filter((p) => p.kind === 'handle')).toEqual([
+      { kind: 'handle', from: { x: 12, y: 12 }, to: { x: 16, y: 12 } },
+    ])
   })
 
   it('emits one segment outline per segment of selected shapes, closing segment included, and none for unselected shapes', () => {
     const open = shape([n({ x: 0, y: 0 }), n({ x: 10, y: 0 }), n({ x: 10, y: 10 })])
-    const closed = shape([n({ x: 0, y: 0 }), n({ x: 10, y: 0 }), n({ x: 10, y: 10 }), n({ x: 0, y: 10 })], true)
+    const closed = shape(
+      [n({ x: 0, y: 0 }), n({ x: 10, y: 0 }), n({ x: 10, y: 10 }), n({ x: 0, y: 10 })],
+      true,
+    )
     const other = shape([n({ x: 50, y: 50 }), n({ x: 60, y: 50 })])
     const doc = docWith([open, closed, other])
-    const outlines = (ids: string[]) => nodeOverlay(doc, { shapeIds: ids, nodes: [] }).filter((p) => p.kind === 'segmentOutline')
+    const outlines = (ids: string[]) =>
+      nodeOverlay(doc, { shapeIds: ids, nodes: [] }).filter((p) => p.kind === 'segmentOutline')
     expect(outlines([open.id])).toHaveLength(2)
     expect(outlines([closed.id])).toHaveLength(4)
     expect(outlines([other.id, open.id])).toHaveLength(3)
@@ -300,7 +337,10 @@ describe('node tool hover refresh after a doc change without pointer movement', 
 
   it('updates the segment highlight to the new geometry while the pointer is still on the segment', () => {
     const { s, a } = straight()
-    const { store, tool } = setup([s], { shapeIds: [s.id], nodes: [{ shapeId: s.id, subpathId: s.subpaths[0].id, nodeId: a.id }] })
+    const { store, tool } = setup([s], {
+      shapeIds: [s.id],
+      nodes: [{ shapeId: s.id, subpathId: s.subpaths[0].id, nodeId: a.id }],
+    })
     tool.hover(ev(12, 20))
 
     store.dispatch(translateNodes(store.getState().selection, -2, 0))
@@ -308,13 +348,22 @@ describe('node tool hover refresh after a doc change without pointer movement', 
     const hl = tool.overlay().find((p) => p.kind === 'segmentHover')
     expect(hl).toBeDefined()
     const seg = segmentsOf(store.getState().doc.shapes[0].subpaths[0])[0]
-    expect(hl).toEqual({ kind: 'segmentHover', from: seg.from.p, c1: seg.c1, c2: seg.c2, to: seg.to.p })
+    expect(hl).toEqual({
+      kind: 'segmentHover',
+      from: seg.from.p,
+      c1: seg.c1,
+      c2: seg.c2,
+      to: seg.to.p,
+    })
     expect(hl).toMatchObject({ from: { x: 0, y: 20 }, to: { x: 22, y: 20 } })
   })
 
   it('does nothing before any hover position is known', () => {
     const { s, b } = straight()
-    const { store, tool } = setup([s], { shapeIds: [s.id], nodes: [{ shapeId: s.id, subpathId: s.subpaths[0].id, nodeId: b.id }] })
+    const { store, tool } = setup([s], {
+      shapeIds: [s.id],
+      nodes: [{ shapeId: s.id, subpathId: s.subpaths[0].id, nodeId: b.id }],
+    })
     store.dispatch(translateNodes(store.getState().selection, 0, 20))
     tool.refreshHover()
     expect(tool.overlay()).toEqual([])

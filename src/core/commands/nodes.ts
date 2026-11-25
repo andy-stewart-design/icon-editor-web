@@ -70,7 +70,10 @@ function sameValue(a: unknown, b: unknown): boolean {
 // Groups the refs by shape and subpath, then applies f to each subpath that holds one of them. f gets a plain copy
 // and returns the new subpath. A subpath is replaced only when its content changed, so a no-op edit keeps the doc
 // reference and records no history entry.
-function editSubpaths(refs: readonly NodeRef[], f: (sp: Subpath, nodeIds: ReadonlySet<string>) => Subpath): Recipe {
+function editSubpaths(
+  refs: readonly NodeRef[],
+  f: (sp: Subpath, nodeIds: ReadonlySet<string>) => Subpath,
+): Recipe {
   const wanted = new Map<string, Set<string>>()
   for (const r of refs) {
     const key = `${r.shapeId}\u0000${r.subpathId}`
@@ -92,14 +95,20 @@ function editSubpaths(refs: readonly NodeRef[], f: (sp: Subpath, nodeIds: Readon
 }
 
 // Sets the anchor and handles of each listed node to the given anchor. Handles follow (see moveAnchor).
-function moveNodesWith(sp: Subpath, ids: ReadonlySet<string>, target: (n: PathNode) => Pt): Subpath {
+function moveNodesWith(
+  sp: Subpath,
+  ids: ReadonlySet<string>,
+  target: (n: PathNode) => Pt,
+): Subpath {
   return { ...sp, nodes: sp.nodes.map((n) => (ids.has(n.id) ? moveAnchor(n, target(n)) : n)) }
 }
 
 // Translates each listed node by (dx, dy) relative to the doc the recipe is applied to. Handles move with the anchor.
 export function moveNodesRecipe(refs: readonly NodeRef[], dx: number, dy: number): Recipe {
   if (dx === 0 && dy === 0) return () => {}
-  return editSubpaths(refs, (sp, ids) => moveNodesWith(sp, ids, (n) => ({ x: n.p.x + dx, y: n.p.y + dy })))
+  return editSubpaths(refs, (sp, ids) =>
+    moveNodesWith(sp, ids, (n) => ({ x: n.p.x + dx, y: n.p.y + dy })),
+  )
 }
 
 // Moves one handle of a node to pt. The node's mode is applied to the opposite handle (see moveHandle).
@@ -111,7 +120,12 @@ export function setNodeHandleRecipe(ref: NodeRef, which: 'in' | 'out', pt: Pt): 
 }
 
 // Translates the selected nodes by (dx, dy). One entry. Used by nudging in node mode.
-export function translateNodes(sel: Selection, dx: number, dy: number, label = 'Move nodes'): Command {
+export function translateNodes(
+  sel: Selection,
+  dx: number,
+  dy: number,
+  label = 'Move nodes',
+): Command {
   return { label, recipe: moveNodesRecipe(sel.nodes, dx, dy), selectionAfter: sel }
 }
 
@@ -144,13 +158,21 @@ export function setSelectedNodesMode(sel: Selection, mode: NodePanelMode): Comma
           if (mode === 'free') {
             const cur = out.nodes.find((n) => n.id === id)
             if (cur && nodePanelMode(cur) === 'straight') {
-              out = setNodeMode({ ...out, nodes: out.nodes.map((n) => (n.id === id ? retractHandles(n) : n)) }, id, 'smooth')
+              out = setNodeMode(
+                { ...out, nodes: out.nodes.map((n) => (n.id === id ? retractHandles(n) : n)) },
+                id,
+                'smooth',
+              )
             }
           }
           out = {
             ...out,
             nodes: out.nodes.map((n) =>
-              n.id !== id ? n : mode === 'straight' ? { ...retractHandles(n), mode: 'corner' } : { ...n, mode: 'corner' },
+              n.id !== id
+                ? n
+                : mode === 'straight'
+                  ? { ...retractHandles(n), mode: 'corner' }
+                  : { ...n, mode: 'corner' },
             ),
           }
         }
@@ -184,7 +206,10 @@ export function insertNode(
       target.subpaths[idx] = plainSubpath(next)
     },
     selectionAfter: added
-      ? { shapeIds: sel.shapeIds, nodes: [{ shapeId: at.shapeId, subpathId: at.subpathId, nodeId: added.id }] }
+      ? {
+          shapeIds: sel.shapeIds,
+          nodes: [{ shapeId: at.shapeId, subpathId: at.subpathId, nodeId: added.id }],
+        }
       : sel,
   }
 }
@@ -264,7 +289,9 @@ export function selectedNodes(doc: IconDoc, sel: Selection): ResolvedNode[] {
 // non-zero handle as free, and smooth and symmetric nodes as stored.
 export function nodePanelMode(node: PathNode): NodePanelMode {
   if (node.mode !== 'corner') return node.mode
-  const bent = [node.hIn, node.hOut].some((h) => h !== undefined && Math.hypot(h.x - node.p.x, h.y - node.p.y) > 0)
+  const bent = [node.hIn, node.hOut].some(
+    (h) => h !== undefined && Math.hypot(h.x - node.p.x, h.y - node.p.y) > 0,
+  )
   return bent ? 'free' : 'straight'
 }
 
@@ -272,7 +299,8 @@ export function nodePanelMode(node: PathNode): NodePanelMode {
 export function nodePanelState(doc: IconDoc, sel: Selection): NodePanelState | null {
   const picked = selectedNodes(doc, sel)
   if (picked.length === 0) return null
-  const axis = (vals: number[]): number | 'mixed' => (vals.every((v) => Math.abs(v - vals[0]) < EPS) ? vals[0] : 'mixed')
+  const axis = (vals: number[]): number | 'mixed' =>
+    vals.every((v) => Math.abs(v - vals[0]) < EPS) ? vals[0] : 'mixed'
   const modes = picked.map((r) => nodePanelMode(r.node))
   return {
     count: picked.length,
@@ -284,7 +312,12 @@ export function nodePanelState(doc: IconDoc, sel: Selection): NodePanelState | n
 
 // Build the edit only while the pinned geometry is current. The store uses immutable snapshots;
 // comparing the subpaths reference allows unrelated changes (including style) to survive.
-export function drawContour(doc: IconDoc, pinned: PathShape, next: Subpath, previous?: Subpath): Command | null {
+export function drawContour(
+  doc: IconDoc,
+  pinned: PathShape,
+  next: Subpath,
+  previous?: Subpath,
+): Command | null {
   const target = doc.shapes.find((s) => s.id === pinned.id)
   if (!target || target.subpaths !== pinned.subpaths || next === previous) return null
   const index = previous ? target.subpaths.indexOf(previous) : -1

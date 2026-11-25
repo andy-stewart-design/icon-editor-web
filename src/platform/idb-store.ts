@@ -23,7 +23,10 @@ export function openIdbStore(dbName = 'icon-editor', storeName = 'kv'): Promise<
       // Release the connection when another tab upgrades or deletes the database, so it isn't blocked.
       db.onversionchange = () => db.close()
 
-      const run = <T>(mode: IDBTransactionMode, op: (store: IDBObjectStore) => IDBRequest<T>): Promise<T> =>
+      const run = <T>(
+        mode: IDBTransactionMode,
+        op: (store: IDBObjectStore) => IDBRequest<T>,
+      ): Promise<T> =>
         new Promise((done, fail) => {
           const tx = db.transaction(storeName, mode)
           const result = op(tx.objectStore(storeName))

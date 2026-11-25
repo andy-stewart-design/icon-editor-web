@@ -6,9 +6,11 @@ type Attr = [string, string]
 const pt = (p: Pt): string => `${formatNumber(p.x)} ${formatNumber(p.y)}`
 
 // Only numbers and validated enum values reach attributes, but escape anyway so the output is always well-formed.
-const escapeAttr = (v: string): string => v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;')
+const escapeAttr = (v: string): string =>
+  v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;')
 
-const attrString = (attrs: Attr[]): string => attrs.map(([k, v]) => ` ${k}="${escapeAttr(v)}"`).join('')
+const attrString = (attrs: Attr[]): string =>
+  attrs.map(([k, v]) => ` ${k}="${escapeAttr(v)}"`).join('')
 
 export function rootAttributes(doc: IconDoc): Attr[] {
   const size = formatNumber(doc.size)

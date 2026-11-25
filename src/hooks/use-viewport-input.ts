@@ -81,7 +81,9 @@ export function useViewportInput(ref: RefObject<HTMLDivElement | null>): void {
         e.preventDefault()
         if (!gestureStart) return
         const pt = last ?? { x: el.clientWidth / 2, y: el.clientHeight / 2 }
-        store.setUi({ viewport: zoomAt(gestureStart, gestureStart.zoom * (e as GestureEvent).scale, pt) })
+        store.setUi({
+          viewport: zoomAt(gestureStart, gestureStart.zoom * (e as GestureEvent).scale, pt),
+        })
       },
       { signal },
     )

@@ -17,7 +17,12 @@ import {
 } from './nodes'
 import { scaleAbout } from './transform'
 
-const node = (id: string, p: Pt, extra: Partial<PathNode> = {}): PathNode => ({ id, p, mode: 'corner', ...extra })
+const node = (id: string, p: Pt, extra: Partial<PathNode> = {}): PathNode => ({
+  id,
+  p,
+  mode: 'corner',
+  ...extra,
+})
 const shapeOf = (subpaths: Subpath[]): PathShape => ({ id: 's', type: 'path', subpaths, style: {} })
 const near = (a: Pt, b: Pt, eps = 1e-9) => {
   expect(Math.abs(a.x - b.x)).toBeLessThan(eps)
@@ -35,7 +40,8 @@ function distToPolyline(pt: Pt, poly: Pt[]): number {
     const b = poly[i + 1]
     const d = sub(b, a)
     const l2 = d.x * d.x + d.y * d.y
-    const t = l2 === 0 ? 0 : Math.min(1, Math.max(0, ((pt.x - a.x) * d.x + (pt.y - a.y) * d.y) / l2))
+    const t =
+      l2 === 0 ? 0 : Math.min(1, Math.max(0, ((pt.x - a.x) * d.x + (pt.y - a.y) * d.y) / l2))
     best = Math.min(best, len(sub(pt, { x: a.x + d.x * t, y: a.y + d.y * t })))
   }
   return best
@@ -82,7 +88,8 @@ describe('insertNodeAt', () => {
     expect(curve.nodes[1].mode).toBe('smooth')
     const m = curve.nodes[1]
     // Collinear: the handles lie on opposite sides of the anchor.
-    const cross = (m.hIn!.x - m.p.x) * (m.hOut!.y - m.p.y) - (m.hIn!.y - m.p.y) * (m.hOut!.x - m.p.x)
+    const cross =
+      (m.hIn!.x - m.p.x) * (m.hOut!.y - m.p.y) - (m.hIn!.y - m.p.y) * (m.hOut!.x - m.p.x)
     expect(Math.abs(cross)).toBeLessThan(1e-9)
 
     const line: Subpath = {
@@ -192,7 +199,13 @@ describe('moveHandle', () => {
 describe('applyNodeMode', () => {
   it('smooth aligns both handles to the averaged direction and keeps lengths', () => {
     // Out points east (length 2), in points north-west-ish: hIn = p + (0,-4)... i.e. outward b = (0,4) direction north.
-    const n: PathNode = { id: 'n', p: { x: 0, y: 0 }, mode: 'corner', hOut: { x: 2, y: 0 }, hIn: { x: 0, y: -4 } }
+    const n: PathNode = {
+      id: 'n',
+      p: { x: 0, y: 0 },
+      mode: 'corner',
+      hOut: { x: 2, y: 0 },
+      hIn: { x: 0, y: -4 },
+    }
     const out = applyNodeMode(n, 'smooth')
     expect(out.mode).toBe('smooth')
     // Averaged outward direction: normalize((1,0) + (0,1)) = (1,1)/sqrt2.
@@ -202,14 +215,26 @@ describe('applyNodeMode', () => {
   })
 
   it('symmetric also equalises lengths to the average', () => {
-    const n: PathNode = { id: 'n', p: { x: 0, y: 0 }, mode: 'corner', hOut: { x: 2, y: 0 }, hIn: { x: -6, y: 0 } }
+    const n: PathNode = {
+      id: 'n',
+      p: { x: 0, y: 0 },
+      mode: 'corner',
+      hOut: { x: 2, y: 0 },
+      hIn: { x: -6, y: 0 },
+    }
     const out = applyNodeMode(n, 'symmetric')
     near(out.hOut!, { x: 4, y: 0 })
     near(out.hIn!, { x: -4, y: 0 })
   })
 
   it('corner only changes the mode', () => {
-    const n: PathNode = { id: 'n', p: { x: 0, y: 0 }, mode: 'smooth', hOut: { x: 2, y: 0 }, hIn: { x: 0, y: -4 } }
+    const n: PathNode = {
+      id: 'n',
+      p: { x: 0, y: 0 },
+      mode: 'smooth',
+      hOut: { x: 2, y: 0 },
+      hIn: { x: 0, y: -4 },
+    }
     expect(applyNodeMode(n, 'corner')).toEqual({ ...n, mode: 'corner' })
   })
 
@@ -308,7 +333,11 @@ describe('breakAtNodes', () => {
         id: 'sp',
         closed: false,
         nodes: ['a', 'b', 'c', 'd', 'e'].map((id, i) =>
-          node(id, { x: i * 10, y: 0 }, { hIn: { x: i * 10 - 1, y: 1 }, hOut: { x: i * 10 + 1, y: 1 } }),
+          node(
+            id,
+            { x: i * 10, y: 0 },
+            { hIn: { x: i * 10 - 1, y: 1 }, hOut: { x: i * 10 + 1, y: 1 } },
+          ),
         ),
       },
     ])
@@ -406,8 +435,16 @@ describe('enforceNodeModes after non-uniform scale', () => {
         closed: false,
         nodes: [
           node('a', { x: 0, y: 0 }, { hOut: { x: 3, y: 0 } }),
-          node('b', { x: 10, y: 10 }, { hIn: { x: 6, y: 10 }, hOut: { x: 10, y: 15 }, mode: 'smooth' }),
-          node('c', { x: 20, y: 0 }, { hIn: { x: 22, y: 6 }, hOut: { x: 26, y: 1 }, mode: 'symmetric' }),
+          node(
+            'b',
+            { x: 10, y: 10 },
+            { hIn: { x: 6, y: 10 }, hOut: { x: 10, y: 15 }, mode: 'smooth' },
+          ),
+          node(
+            'c',
+            { x: 20, y: 0 },
+            { hIn: { x: 22, y: 6 }, hOut: { x: 26, y: 1 }, mode: 'symmetric' },
+          ),
           node('d', { x: 30, y: 10 }, { hIn: { x: 27, y: 9 } }),
         ],
       },
@@ -448,7 +485,13 @@ describe('enforceNodeModes after non-uniform scale', () => {
 
 describe('retractHandles', () => {
   it('removes both handle keys and keeps mode and anchor', () => {
-    const n: PathNode = { id: 'n', p: { x: 2, y: 3 }, mode: 'symmetric', hIn: { x: 0, y: 3 }, hOut: { x: 4, y: 3 } }
+    const n: PathNode = {
+      id: 'n',
+      p: { x: 2, y: 3 },
+      mode: 'symmetric',
+      hIn: { x: 0, y: 3 },
+      hOut: { x: 4, y: 3 },
+    }
     const out = retractHandles(n)
     expect(out).toEqual({ id: 'n', p: { x: 2, y: 3 }, mode: 'symmetric' })
     expect('hIn' in out).toBe(false)
@@ -545,7 +588,11 @@ describe('setNodeMode (subpath)', () => {
       closed: false,
       nodes: [node('a', { x: 0, y: 0 }), node('b', { x: 0, y: 0 }), node('c', { x: 5, y: 0 })],
     }
-    expect(byId(setNodeMode(sp, 'b', 'smooth'), 'b')).toEqual({ id: 'b', p: { x: 0, y: 0 }, mode: 'smooth' })
+    expect(byId(setNodeMode(sp, 'b', 'smooth'), 'b')).toEqual({
+      id: 'b',
+      p: { x: 0, y: 0 },
+      mode: 'smooth',
+    })
   })
 
   it('a node that already has handles behaves as before (applyNodeMode)', () => {
@@ -568,9 +615,16 @@ describe('setNodeMode (subpath)', () => {
 })
 
 describe('cutSegmentAt', () => {
-  const nodes = ['a', 'b', 'c', 'd'].map((id, i) => node(id, { x: 4 * i, y: 4 }, {
-    hIn: { x: 4 * i - 1, y: 5 }, hOut: { x: 4 * i + 1, y: 3 },
-  }))
+  const nodes = ['a', 'b', 'c', 'd'].map((id, i) =>
+    node(
+      id,
+      { x: 4 * i, y: 4 },
+      {
+        hIn: { x: 4 * i - 1, y: 5 },
+        hOut: { x: 4 * i + 1, y: 3 },
+      },
+    ),
+  )
   const sp = { id: 'sp', nodes, closed: false }
   const curves = (s: Subpath) => segmentsOf(s).map((seg) => [seg.from.p, seg.c1, seg.c2, seg.to.p])
 
@@ -581,7 +635,9 @@ describe('cutSegmentAt', () => {
     expect(left.nodes[1].hOut).toBeUndefined()
     expect(right.nodes[0].hIn).toBeUndefined()
     expect([...curves(left), ...curves(right)]).toEqual([curves(sp)[0], curves(sp)[2]])
-    expect(cutSegmentAt(sp, 0).map((s) => [s.id, ...s.nodes.map((n) => n.id)])).toEqual([['sp', 'b', 'c', 'd']])
+    expect(cutSegmentAt(sp, 0).map((s) => [s.id, ...s.nodes.map((n) => n.id)])).toEqual([
+      ['sp', 'b', 'c', 'd'],
+    ])
     expect(cutSegmentAt(sp, 2)[0].nodes.map((n) => n.id)).toEqual(['a', 'b', 'c'])
     expect(cutSegmentAt({ ...sp, nodes: nodes.slice(0, 2) }, 0)).toEqual([])
   })

@@ -183,18 +183,21 @@ describe('editor tool contexts', () => {
     expect(route()).toBe('node-select')
   })
 
-  it.each(['line', 'rect', 'ellipse'] as const)('choosing %s enters Shape atomically', (activeTool) => {
-    const store = createEditorStore(createDefaultDoc())
-    store.setUi({ mode: 'node', activeTool: 'pen' })
-    const seen: string[] = []
-    const unsubscribe = store.subscribe(() => {
-      const { ui } = store.getState()
-      seen.push(`${ui.mode}:${toolContext(ui)}`)
-    })
-    store.setUi({ activeTool })
-    expect(seen).toEqual([`shape:${activeTool}`])
-    unsubscribe()
-    store.setUi({ mode: 'node' })
-    expect(toolContext(store.getState().ui)).toBe('node-select')
-  })
+  it.each(['line', 'rect', 'ellipse'] as const)(
+    'choosing %s enters Shape atomically',
+    (activeTool) => {
+      const store = createEditorStore(createDefaultDoc())
+      store.setUi({ mode: 'node', activeTool: 'pen' })
+      const seen: string[] = []
+      const unsubscribe = store.subscribe(() => {
+        const { ui } = store.getState()
+        seen.push(`${ui.mode}:${toolContext(ui)}`)
+      })
+      store.setUi({ activeTool })
+      expect(seen).toEqual([`shape:${activeTool}`])
+      unsubscribe()
+      store.setUi({ mode: 'node' })
+      expect(toolContext(store.getState().ui)).toBe('node-select')
+    },
+  )
 })

@@ -17,7 +17,9 @@ const baseDoc = (): IconDoc => ({
       id: 's1',
       type: 'path',
       style: {},
-      subpaths: [{ id: 'sp1', closed: false, nodes: [{ id: 'n1', p: { x: 0, y: 0 }, mode: 'corner' }] }],
+      subpaths: [
+        { id: 'sp1', closed: false, nodes: [{ id: 'n1', p: { x: 0, y: 0 }, mode: 'corner' }] },
+      ],
     },
   ],
 })
@@ -86,7 +88,10 @@ describe('editor store history', () => {
 
   it('restores the selection on undo and drops IDs that no longer exist', () => {
     const store = createEditorStore(baseDoc())
-    store.setSelection({ shapeIds: ['s1'], nodes: [{ shapeId: 's1', subpathId: 'sp1', nodeId: 'n1' }] })
+    store.setSelection({
+      shapeIds: ['s1'],
+      nodes: [{ shapeId: 's1', subpathId: 'sp1', nodeId: 'n1' }],
+    })
     store.dispatch({
       label: 'Delete shape',
       recipe: (d) => {

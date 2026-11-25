@@ -28,14 +28,24 @@ declare global {
 const KAPPA = 0.5523 // cubic handle length for a quarter circle, as a fraction of the radius
 
 function fixtureShapes(): Shape[] {
-  const node = (x: number, y: number, mode: NodeMode = 'corner', handles: { hIn?: Pt; hOut?: Pt } = {}): PathNode => ({
+  const node = (
+    x: number,
+    y: number,
+    mode: NodeMode = 'corner',
+    handles: { hIn?: Pt; hOut?: Pt } = {},
+  ): PathNode => ({
     id: newId(),
     p: { x, y },
     mode,
     ...handles,
   })
   const sub = (nodes: PathNode[], closed = false): Subpath => ({ id: newId(), nodes, closed })
-  const path = (subpaths: Subpath[], style: Style = {}): PathShape => ({ id: newId(), type: 'path', subpaths, style })
+  const path = (subpaths: Subpath[], style: Style = {}): PathShape => ({
+    id: newId(),
+    type: 'path',
+    subpaths,
+    style,
+  })
 
   const c = 12
   const r = 6

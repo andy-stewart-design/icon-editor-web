@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { validateArtboardSize, validateStrokeWidth, parseNumber, validateBoundsSize } from './validation'
+import {
+  validateArtboardSize,
+  validateStrokeWidth,
+  parseNumber,
+  validateBoundsSize,
+} from './validation'
 
 describe('numeric field validation', () => {
   it('stroke width must be finite and greater than 0', () => {

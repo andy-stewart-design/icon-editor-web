@@ -25,7 +25,9 @@ export function buildSnapFn(
     enabled: ui.snapEnabled && !suspendSnap,
     increment: ui.snapIncrement,
     tolerance: snapToleranceDoc(zoom),
-    anchors: shapes.flatMap((s) => s.subpaths.flatMap((sp) => sp.nodes.map((n) => ({ id: n.id, p: n.p })))),
+    anchors: shapes.flatMap((s) =>
+      s.subpaths.flatMap((sp) => sp.nodes.map((n) => ({ id: n.id, p: n.p }))),
+    ),
     excludeAnchorIds: excludeNodeIds,
     bounds: shapes
       .filter((s) => !excludeBoundsIds.has(s.id))

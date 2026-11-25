@@ -13,15 +13,24 @@ export default function Notices() {
     <div className={s.stack}>
       {loadNotice === 'recovered' && (
         <div className={s.notice} role="status">
-          <p>Your previous document couldn&apos;t be loaded. A backup was kept and a new document was started.</p>
-          <button type="button" className={s.button} onClick={() => store.setUi({ loadNotice: null })}>
+          <p>
+            Your previous document couldn&apos;t be loaded. A backup was kept and a new document was
+            started.
+          </p>
+          <button
+            type="button"
+            className={s.button}
+            onClick={() => store.setUi({ loadNotice: null })}
+          >
             Dismiss
           </button>
         </div>
       )}
       {saveStatus === 'failing' && (
         <div className={s.notice} role="status">
-          <p>Changes aren&apos;t being saved. Your work stays open, but it may be lost on reload.</p>
+          <p>
+            Changes aren&apos;t being saved. Your work stays open, but it may be lost on reload.
+          </p>
         </div>
       )}
     </div>

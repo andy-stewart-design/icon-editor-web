@@ -27,7 +27,13 @@ const sampleDoc = (): IconDoc => ({
           closed: true,
           nodes: [
             { id: 'n3', p: { x: 0, y: 0 }, mode: 'corner' },
-            { id: 'n4', p: { x: 5, y: 0 }, hIn: { x: 4, y: 1 }, hOut: { x: 6, y: -1 }, mode: 'symmetric' },
+            {
+              id: 'n4',
+              p: { x: 5, y: 0 },
+              hIn: { x: 4, y: 1 },
+              hOut: { x: 6, y: -1 },
+              mode: 'symmetric',
+            },
             { id: 'n5', p: { x: 5, y: 5 }, mode: 'corner' },
           ],
         },
@@ -61,8 +67,34 @@ describe('parseIconDoc', () => {
   it.each([
     ['null', null],
     ['missing shapes', { ...sampleDoc(), shapes: undefined }],
-    ['bad mode', { ...sampleDoc(), shapes: [{ ...sampleDoc().shapes[0], subpaths: [{ id: 'x', closed: false, nodes: [{ id: 'n', p: { x: 0, y: 0 }, mode: 'wobbly' }] }] }] }],
-    ['NaN coordinate', { ...sampleDoc(), shapes: [{ ...sampleDoc().shapes[0], subpaths: [{ id: 'x', closed: false, nodes: [{ id: 'n', p: { x: NaN, y: 0 }, mode: 'corner' }] }] }] }],
+    [
+      'bad mode',
+      {
+        ...sampleDoc(),
+        shapes: [
+          {
+            ...sampleDoc().shapes[0],
+            subpaths: [
+              { id: 'x', closed: false, nodes: [{ id: 'n', p: { x: 0, y: 0 }, mode: 'wobbly' }] },
+            ],
+          },
+        ],
+      },
+    ],
+    [
+      'NaN coordinate',
+      {
+        ...sampleDoc(),
+        shapes: [
+          {
+            ...sampleDoc().shapes[0],
+            subpaths: [
+              { id: 'x', closed: false, nodes: [{ id: 'n', p: { x: NaN, y: 0 }, mode: 'corner' }] },
+            ],
+          },
+        ],
+      },
+    ],
   ])('rejects %s as invalid', (_name, input) => {
     expect(parseIconDoc(input).kind).toBe('invalid')
   })

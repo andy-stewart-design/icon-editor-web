@@ -27,7 +27,10 @@ export default function NodeSection() {
   const doc = useEditor((e) => e.doc)
   const selection = useEditor((e) => e.selection)
 
-  const state = useMemo(() => (active ? nodePanelState(doc, selection) : null), [active, doc, selection])
+  const state = useMemo(
+    () => (active ? nodePanelState(doc, selection) : null),
+    [active, doc, selection],
+  )
   if (!state) return null
 
   const countLabel = state.count === 1 ? '1 node' : `${state.count} nodes`

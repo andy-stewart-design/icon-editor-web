@@ -39,7 +39,14 @@ export default function SelectionOverlay() {
           {handlePoints(bounds).map(({ id, p }) => {
             const c = docToScreen(vp, p)
             return (
-              <rect key={id} className={s.handle} x={c.x - half} y={c.y - half} width={HANDLE_SIZE_PX} height={HANDLE_SIZE_PX} />
+              <rect
+                key={id}
+                className={s.handle}
+                x={c.x - half}
+                y={c.y - half}
+                width={HANDLE_SIZE_PX}
+                height={HANDLE_SIZE_PX}
+              />
             )
           })}
         </>

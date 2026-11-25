@@ -33,6 +33,8 @@ React 19, TypeScript, Vite, Vitest and oxlint, managed with pnpm.
 | `pnpm preview` | Serve the production build locally |
 | `pnpm typecheck` | Run `tsc -b` across the app, core and node configs |
 | `pnpm lint` | Run oxlint, including the core import boundary |
+| `pnpm format` | Format source files and root project files with Oxfmt |
+| `pnpm format:check` | Check the same files without rewriting them |
 | `pnpm test` | Run the Vitest suite once |
 
 Install dependencies with `pnpm install`.

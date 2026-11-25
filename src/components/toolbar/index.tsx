@@ -125,7 +125,9 @@ export default function Toolbar() {
           </button>
         ))}
         {mode === 'node' && activeTool === 'pen' && targetCount !== 1 && (
-          <span className={s.modeLabel} role="status">Select one shape to draw</span>
+          <span className={s.modeLabel} role="status">
+            Select one shape to draw
+          </span>
         )}
         {activeTool === 'rect' && <RadiusInput store={store} />}
       </div>

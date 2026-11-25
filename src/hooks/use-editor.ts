@@ -5,7 +5,10 @@ export const EditorContext = createContext<EditorStore | null>(null)
 
 export function useEditorStore(): EditorStore {
   const store = useContext(EditorContext)
-  if (!store) throw new Error('useEditorStore: no EditorStore in context; wrap the tree in EditorContext.Provider')
+  if (!store)
+    throw new Error(
+      'useEditorStore: no EditorStore in context; wrap the tree in EditorContext.Provider',
+    )
   return store
 }
 

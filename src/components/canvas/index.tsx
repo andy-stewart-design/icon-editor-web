@@ -34,11 +34,17 @@ export default function Canvas() {
       const canvasSize = { width, height }
       // The first non-zero measurement fits the artboard; later resizes keep the current view.
       const first = prev.width === 0 && prev.height === 0 && width > 0 && height > 0
-      store.setUi(first ? { canvasSize, viewport: fitViewport(canvasSize, doc.size, doc.size) } : { canvasSize })
+      store.setUi(
+        first
+          ? { canvasSize, viewport: fitViewport(canvasSize, doc.size, doc.size) }
+          : { canvasSize },
+      )
     }
     const rect = el.getBoundingClientRect()
     measure(rect.width, rect.height)
-    const observer = new ResizeObserver(([entry]) => measure(entry.contentRect.width, entry.contentRect.height))
+    const observer = new ResizeObserver(([entry]) =>
+      measure(entry.contentRect.width, entry.contentRect.height),
+    )
     observer.observe(el)
     return () => observer.disconnect()
   }, [store])

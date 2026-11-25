@@ -18,7 +18,9 @@ export type Guide =
   | { name: GuideName; kind: 'circle'; cx: number; cy: number; r: number; snapLines: SnapLine[] }
 
 // Base-24 definitions. Rects give width/height; circles give diameter.
-type GuideDef = { name: GuideName; kind: 'rect'; w: number; h: number } | { name: GuideName; kind: 'circle'; d: number }
+type GuideDef =
+  | { name: GuideName; kind: 'rect'; w: number; h: number }
+  | { name: GuideName; kind: 'circle'; d: number }
 
 export const GUIDE_DEFS: readonly GuideDef[] = [
   { name: 'padding', kind: 'rect', w: 20, h: 20 },

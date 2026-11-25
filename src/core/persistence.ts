@@ -8,7 +8,8 @@ export interface KeyValueStore {
 
 export const CURRENT_KEY = 'current'
 export const docKey = (id: string): string => `doc:${id}`
-const backupKey = (id: string | null, timestamp: number): string => `backup:${id ?? 'unknown'}:${timestamp}`
+const backupKey = (id: string | null, timestamp: number): string =>
+  `backup:${id ?? 'unknown'}:${timestamp}`
 
 export type LoadResult = { doc: IconDoc; notice: null | 'recovered' }
 
@@ -61,7 +62,12 @@ export type Autosave = {
   dispose: () => void
 }
 
-export function createAutosave({ kv, schedule, delayMs = 400, onStatus }: AutosaveOptions): Autosave {
+export function createAutosave({
+  kv,
+  schedule,
+  delayMs = 400,
+  onStatus,
+}: AutosaveOptions): Autosave {
   let pending: IconDoc | null = null
   let cancelTimer: (() => void) | null = null
   let status: SaveStatus | null = null

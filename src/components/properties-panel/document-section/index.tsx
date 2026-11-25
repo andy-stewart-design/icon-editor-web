@@ -72,12 +72,12 @@ export default function DocumentSection() {
           label="Artboard"
           value={size}
           validate={validateArtboardSize}
-          onCommit={(n) => store.dispatch(resizeArtboard(n, store.getState().ui.artboardResizeMode))}
+          onCommit={(n) =>
+            store.dispatch(resizeArtboard(n, store.getState().ui.artboardResizeMode))
+          }
         />
         <div className={s.resize}>
-          <span className={s.hint}>
-            On resize (applies to artboard size)
-          </span>
+          <span className={s.hint}>On resize (applies to artboard size)</span>
           <SegmentedControl
             label="On resize (applies to artboard size)"
             options={RESIZE_MODES}

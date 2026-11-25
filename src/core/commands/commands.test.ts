@@ -93,7 +93,9 @@ describe('arrange commands', () => {
     expect(doc.shapes[0].id).toBe(a.id)
     const copy = doc.shapes[1]
     expect(copy.id).not.toBe(a.id)
-    expect(copy.subpaths[0].nodes.map((n) => n.id)).not.toEqual(a.subpaths[0].nodes.map((n) => n.id))
+    expect(copy.subpaths[0].nodes.map((n) => n.id)).not.toEqual(
+      a.subpaths[0].nodes.map((n) => n.id),
+    )
     expect(anchors(copy)).toEqual(anchors(a))
     expect(selection.shapeIds).toEqual([copy.id])
 

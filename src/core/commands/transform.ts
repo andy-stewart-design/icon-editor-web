@@ -7,7 +7,10 @@ import type { IconDoc, PathShape, Pt } from '../model'
 // Replaces each listed shape with f(shape). Coordinates are rewritten, so no transform or angle is ever stored,
 // and stroke width is untouched. Recipes read only the doc they are given, so a drag can call them repeatedly
 // from the transaction base without drift.
-function mapShapes(ids: readonly string[], f: (shapes: PathShape[]) => (s: PathShape) => PathShape): Recipe {
+function mapShapes(
+  ids: readonly string[],
+  f: (shapes: PathShape[]) => (s: PathShape) => PathShape,
+): Recipe {
   const set = new Set(ids)
   return (doc: IconDoc) => {
     const picked = doc.shapes.filter((s) => set.has(s.id))
@@ -57,7 +60,8 @@ export function resizeFactors(
   if (keepAspect) {
     const horizontal = left || right
     const vertical = top || bottom
-    const m = horizontal && vertical ? Math.max(Math.abs(sx), Math.abs(sy)) : Math.abs(horizontal ? sx : sy)
+    const m =
+      horizontal && vertical ? Math.max(Math.abs(sx), Math.abs(sy)) : Math.abs(horizontal ? sx : sy)
     if (horizontal) sx = (sx < 0 ? -1 : 1) * m
     if (vertical) sy = (sy < 0 ? -1 : 1) * m
     if (!horizontal) sx = m
@@ -68,7 +72,8 @@ export function resizeFactors(
 
 // Rotation, in radians, that takes the direction center→from to center→to. Shift rounds it to 15° steps.
 export function rotationAngle(center: Pt, from: Pt, to: Pt, step15 = false): number {
-  const a = Math.atan2(to.y - center.y, to.x - center.x) - Math.atan2(from.y - center.y, from.x - center.x)
+  const a =
+    Math.atan2(to.y - center.y, to.x - center.x) - Math.atan2(from.y - center.y, from.x - center.x)
   if (!step15) return a
   const step = Math.PI / 12
   return Math.round(a / step) * step
@@ -92,7 +97,11 @@ export function flipRecipe(ids: readonly string[], axis: 'h' | 'v'): Recipe {
 }
 
 export function resizeSelection(sel: Selection, sx: number, sy: number, anchor: Pt): Command {
-  return { label: 'Resize', recipe: resizeRecipe(sel.shapeIds, sx, sy, anchor), selectionAfter: sel }
+  return {
+    label: 'Resize',
+    recipe: resizeRecipe(sel.shapeIds, sx, sy, anchor),
+    selectionAfter: sel,
+  }
 }
 
 export function rotateSelection(sel: Selection, angle: number, center: Pt): Command {

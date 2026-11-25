@@ -1,9 +1,4 @@
-import {
-  insertNode,
-  moveNodesRecipe,
-  selectedNodes,
-  setNodeHandleRecipe,
-} from '../commands/nodes'
+import { insertNode, moveNodesRecipe, selectedNodes, setNodeHandleRecipe } from '../commands/nodes'
 import type { Recipe } from '../commands'
 import type { Rect } from '../geometry/bounds'
 import { nearestSegment } from '../geometry/nodes'
@@ -68,13 +63,15 @@ export function hitNode(doc: IconDoc, sel: Selection, pt: Pt, zoom: number): Nod
       for (const n of sp.nodes) {
         const ref: NodeRef = { shapeId: shape.id, subpathId: sp.id, nodeId: n.id }
         const d = dist(n.p, pt)
-        if (d <= tol && (!anchor || d < anchor.d)) anchor = { hit: { kind: 'anchor', ref, p: n.p }, d }
+        if (d <= tol && (!anchor || d < anchor.d))
+          anchor = { hit: { kind: 'anchor', ref, p: n.p }, d }
         if (!selected.has(keyOf(ref))) continue
         for (const which of ['in', 'out'] as const) {
           const h = which === 'in' ? n.hIn : n.hOut
           if (!h || dist(h, n.p) <= tol) continue
           const hd = dist(h, pt)
-          if (hd <= tol && (!handle || hd < handle.d)) handle = { hit: { kind: 'handle', ref, which, p: h }, d: hd }
+          if (hd <= tol && (!handle || hd < handle.d))
+            handle = { hit: { kind: 'handle', ref, which, p: h }, d: hd }
         }
       }
     }
@@ -82,18 +79,36 @@ export function hitNode(doc: IconDoc, sel: Selection, pt: Pt, zoom: number): Nod
   if (handle) return handle.hit
   if (anchor) return anchor.hit
 
-  let best: { shape: PathShape; subpathIndex: number; segIndex: number; t: number; point: Pt; d: number } | null = null
+  let best: {
+    shape: PathShape
+    subpathIndex: number
+    segIndex: number
+    t: number
+    point: Pt
+    d: number
+  } | null = null
   for (const shape of shapes) {
     const near = nearestSegment(shape, pt)
     if (!near) continue
     const reach = tol + (shape.style.strokeWidth ?? doc.strokeWidth) / 2
     if (near.distance > reach || (best && near.distance >= best.d)) continue
-    best = { shape, subpathIndex: near.subpathIndex, segIndex: near.segIndex, t: near.t, point: near.point, d: near.distance }
+    best = {
+      shape,
+      subpathIndex: near.subpathIndex,
+      segIndex: near.segIndex,
+      t: near.t,
+      point: near.point,
+      d: near.distance,
+    }
   }
   if (!best) return null
   const sp = best.shape.subpaths[best.subpathIndex]
   const n = sp.nodes.length
-  const seg = segmentBetween(best.segIndex, sp.nodes[best.segIndex], sp.nodes[(best.segIndex + 1) % n])
+  const seg = segmentBetween(
+    best.segIndex,
+    sp.nodes[best.segIndex],
+    sp.nodes[(best.segIndex + 1) % n],
+  )
   return {
     kind: 'segment',
     ref: { shapeId: best.shape.id, subpathId: sp.id, fromId: seg.from.id, toId: seg.to.id },
@@ -120,7 +135,12 @@ function anchorsInRect(doc: IconDoc, shapeIds: readonly string[], r: Rect): Node
 }
 
 function rectBetween(a: Pt, b: Pt): Rect {
-  return { x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), w: Math.abs(b.x - a.x), h: Math.abs(b.y - a.y) }
+  return {
+    x: Math.min(a.x, b.x),
+    y: Math.min(a.y, b.y),
+    w: Math.abs(b.x - a.x),
+    h: Math.abs(b.y - a.y),
+  }
 }
 
 // Neutral outline of every segment of the selected shapes. The Select tool draws it too, so it lives apart from the node
@@ -130,7 +150,8 @@ export function selectionOutline(doc: IconDoc, sel: Selection): OverlayPrimitive
   for (const shape of doc.shapes) {
     if (!sel.shapeIds.includes(shape.id)) continue
     for (const sp of shape.subpaths) {
-      for (const seg of segmentsOf(sp)) out.push({ kind: 'segmentOutline', from: seg.from.p, c1: seg.c1, c2: seg.c2, to: seg.to.p })
+      for (const seg of segmentsOf(sp))
+        out.push({ kind: 'segmentOutline', from: seg.from.p, c1: seg.c1, c2: seg.c2, to: seg.to.p })
     }
   }
   return out
@@ -142,7 +163,14 @@ export function selectionOutline(doc: IconDoc, sel: Selection): OverlayPrimitive
 export function nodeOverlay(doc: IconDoc, sel: Selection): OverlayPrimitive[] {
   const out: OverlayPrimitive[] = [...selectionOutline(doc, sel)]
   const picked = sel.segment && resolveSegment(doc, sel.segment)?.segment
-  if (picked) out.push({ kind: 'segmentSelected', from: picked.from.p, c1: picked.c1, c2: picked.c2, to: picked.to.p })
+  if (picked)
+    out.push({
+      kind: 'segmentSelected',
+      from: picked.from.p,
+      c1: picked.c1,
+      c2: picked.c2,
+      to: picked.to.p,
+    })
   const selected = new Set(sel.nodes.map(keyOf))
   for (const shape of doc.shapes) {
     if (!sel.shapeIds.includes(shape.id)) continue
@@ -208,7 +236,13 @@ export function createNodeTool(host: NodeHost): NodeTool {
   // and when the tool is deactivated, so a refresh never uses a point from before the press.
   let lastHover: { pt: Pt; zoom: number } | null = null
 
-  const setHover = (hit: NodeHit | null, doc: IconDoc, pt: Pt, zoom: number, sel: Selection): void => {
+  const setHover = (
+    hit: NodeHit | null,
+    doc: IconDoc,
+    pt: Pt,
+    zoom: number,
+    sel: Selection,
+  ): void => {
     hoverPrim = null
     hoverCursor = 'default'
     if (hit?.kind === 'anchor') {
@@ -245,7 +279,14 @@ export function createNodeTool(host: NodeHost): NodeTool {
   }
 
   const moveHandleTo = (g: Extract<Gesture, { kind: 'handle' }>, e: ToolEvent): void => {
-    const snap = buildSnapFn(host.getState(), e.zoom, e.suspendSnap, new Set(), new Set([g.ref.nodeId]), new Set([g.ref.shapeId]))
+    const snap = buildSnapFn(
+      host.getState(),
+      e.zoom,
+      e.suspendSnap,
+      new Set(),
+      new Set([g.ref.nodeId]),
+      new Set([g.ref.shapeId]),
+    )
     const s = snap(e.pt)
     host.update(setNodeHandleRecipe(g.ref, g.which, s.point))
     g.indicator = snapIndicator(s.targets)
@@ -253,7 +294,11 @@ export function createNodeTool(host: NodeHost): NodeTool {
 
   // A press only becomes a drag once the pointer leaves the dead zone. After that the full offset applies.
   const passedThreshold = (g: { start: Pt; dragged: boolean }, e: ToolEvent): boolean => {
-    if (!g.dragged && Math.hypot(e.pt.x - g.start.x, e.pt.y - g.start.y) * e.zoom >= DRAG_THRESHOLD_PX) g.dragged = true
+    if (
+      !g.dragged &&
+      Math.hypot(e.pt.x - g.start.x, e.pt.y - g.start.y) * e.zoom >= DRAG_THRESHOLD_PX
+    )
+      g.dragged = true
     return g.dragged
   }
 
@@ -297,7 +342,15 @@ export function createNodeTool(host: NodeHost): NodeTool {
 
       if (hit?.kind === 'handle') {
         host.begin('Move handle')
-        gesture = { kind: 'handle', ref: hit.ref, which: hit.which, start: e.pt, dragged: false, indicator: [], before: selection }
+        gesture = {
+          kind: 'handle',
+          ref: hit.ref,
+          which: hit.which,
+          start: e.pt,
+          dragged: false,
+          indicator: [],
+          before: selection,
+        }
         return
       }
 
@@ -332,9 +385,14 @@ export function createNodeTool(host: NodeHost): NodeTool {
         return
       }
 
-      const other = hitTestShape({ ...doc, shapes: doc.shapes.filter((s) => !selection.shapeIds.includes(s.id)) }, e.pt, e.zoom)
+      const other = hitTestShape(
+        { ...doc, shapes: doc.shapes.filter((s) => !selection.shapeIds.includes(s.id)) },
+        e.pt,
+        e.zoom,
+      )
       if (other !== null) {
-        if (e.shift) host.setSelection({ shapeIds: [...selection.shapeIds, other], nodes: selection.nodes })
+        if (e.shift)
+          host.setSelection({ shapeIds: [...selection.shapeIds, other], nodes: selection.nodes })
         else host.setSelection({ shapeIds: [other], nodes: [] })
         return
       }
@@ -346,7 +404,8 @@ export function createNodeTool(host: NodeHost): NodeTool {
         base: e.shift ? [...selection.nodes] : [],
         before: selection,
       }
-      if (!e.shift || selection.segment) host.setSelection({ shapeIds: selection.shapeIds, nodes: [] })
+      if (!e.shift || selection.segment)
+        host.setSelection({ shapeIds: selection.shapeIds, nodes: [] })
     },
 
     pointerMove(e) {
@@ -370,7 +429,11 @@ export function createNodeTool(host: NodeHost): NodeTool {
       if (g.kind === 'segment') {
         gesture = null
         const { doc, selection } = host.getState()
-        if (!passedThreshold(g, e) && selection.shapeIds.includes(g.ref.shapeId) && resolveSegment(doc, g.ref)) {
+        if (
+          !passedThreshold(g, e) &&
+          selection.shapeIds.includes(g.ref.shapeId) &&
+          resolveSegment(doc, g.ref)
+        ) {
           host.setSelection({ shapeIds: [g.ref.shapeId], nodes: [], segment: g.ref })
         }
         return
@@ -394,7 +457,10 @@ export function createNodeTool(host: NodeHost): NodeTool {
       const { selection } = host.getState()
       let after: Selection | undefined
       if (g.shift && g.wasSelected)
-        after = { shapeIds: selection.shapeIds, nodes: selection.nodes.filter((r) => !sameRef(r, g.pressed)) }
+        after = {
+          shapeIds: selection.shapeIds,
+          nodes: selection.nodes.filter((r) => !sameRef(r, g.pressed)),
+        }
       else if (!g.shift && g.wasSelected && selection.nodes.length > 1)
         after = { shapeIds: selection.shapeIds, nodes: [g.pressed] }
       host.commit(after)
@@ -411,7 +477,8 @@ export function createNodeTool(host: NodeHost): NodeTool {
         return
       }
       const { selection } = host.getState()
-      if (selection.nodes.length > 0 || selection.segment) host.setSelection({ shapeIds: selection.shapeIds, nodes: [] })
+      if (selection.nodes.length > 0 || selection.segment)
+        host.setSelection({ shapeIds: selection.shapeIds, nodes: [] })
     },
 
     overlay() {

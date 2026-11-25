@@ -11,7 +11,11 @@ export type StyleValue<F extends StyleField> = Exclude<Style[F], undefined>
 
 // Writes one style field on every listed shape. Shapes whose value already matches are left alone, so a no-op
 // yields an unchanged doc.
-function setStyleField<F extends StyleField>(ids: readonly string[], field: F, value: StyleValue<F>): Recipe {
+function setStyleField<F extends StyleField>(
+  ids: readonly string[],
+  field: F,
+  value: StyleValue<F>,
+): Recipe {
   const set = new Set(ids)
   return (doc) => {
     for (const s of doc.shapes) {
@@ -31,7 +35,12 @@ function resetStyleField(ids: readonly string[], field: StyleField): Recipe {
   }
 }
 
-function overrideCommand<F extends StyleField>(sel: Selection, field: F, value: StyleValue<F>, label: string): Command {
+function overrideCommand<F extends StyleField>(
+  sel: Selection,
+  field: F,
+  value: StyleValue<F>,
+  label: string,
+): Command {
   return { label, recipe: setStyleField(sel.shapeIds, field, value), selectionAfter: sel }
 }
 
@@ -47,14 +56,20 @@ export const setLinecapOverride = (sel: Selection, cap: Linecap): Command =>
 export const setLinejoinOverride = (sel: Selection, join: Linejoin): Command =>
   overrideCommand(sel, 'linejoin', join, 'Linejoin override')
 
-export const resetStrokeWidth = (sel: Selection): Command => resetCommand(sel, 'strokeWidth', 'Reset stroke width')
-export const resetLinecap = (sel: Selection): Command => resetCommand(sel, 'linecap', 'Reset linecap')
-export const resetLinejoin = (sel: Selection): Command => resetCommand(sel, 'linejoin', 'Reset linejoin')
+export const resetStrokeWidth = (sel: Selection): Command =>
+  resetCommand(sel, 'strokeWidth', 'Reset stroke width')
+export const resetLinecap = (sel: Selection): Command =>
+  resetCommand(sel, 'linecap', 'Reset linecap')
+export const resetLinejoin = (sel: Selection): Command =>
+  resetCommand(sel, 'linejoin', 'Reset linejoin')
 
 // What the panel shows for one field across the selection.
 // none: nothing selected. same: every selected shape has the same effective value; overridden is true only when
 // every one of them sets its own. mixed: effective values differ.
-export type FieldState<V> = { kind: 'none' } | { kind: 'same'; value: V; overridden: boolean } | { kind: 'mixed' }
+export type FieldState<V> =
+  | { kind: 'none' }
+  | { kind: 'same'; value: V; overridden: boolean }
+  | { kind: 'mixed' }
 
 // Selected shapes in doc order. Stale ids in the selection are skipped.
 function selectedShapes(doc: IconDoc, sel: Selection): PathShape[] {
@@ -73,7 +88,11 @@ export function selectionField<F extends StyleField>(
   const effective = (s: PathShape): StyleValue<F> => (s.style[field] ?? doc[field]) as StyleValue<F>
   const first = effective(shapes[0])
   if (!shapes.every((s) => effective(s) === first)) return { kind: 'mixed' }
-  return { kind: 'same', value: first, overridden: shapes.every((s) => s.style[field] !== undefined) }
+  return {
+    kind: 'same',
+    value: first,
+    overridden: shapes.every((s) => s.style[field] !== undefined),
+  }
 }
 
 // True when any selected shape sets an override for the field. The panel uses this to enable Reset.
@@ -90,7 +109,13 @@ export function selectionRect(doc: IconDoc, sel: Selection): Rect | null {
 // Moves and scales the selection so its combined bounds become (x, y, w, h). Scaling is about the current bounds
 // origin, then translation. A dimension that is currently 0 (a horizontal line has h = 0) keeps scale 1, and a
 // requested size for that axis is ignored. Stroke widths are never touched. Invalid targets make the command a no-op.
-export function setSelectionBounds(sel: Selection, x: number, y: number, w: number, h: number): Command {
+export function setSelectionBounds(
+  sel: Selection,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+): Command {
   return {
     label: 'Set bounds',
     recipe: (doc) => {
@@ -108,7 +133,9 @@ export function setSelectionBounds(sel: Selection, x: number, y: number, w: numb
       if (sx === 1 && sy === 1 && dx === 0 && dy === 0) return
       // Scaling about the min corner keeps that corner fixed, so the translation lands the box exactly on (x, y).
       const origin = { x: b.x, y: b.y }
-      doc.shapes = doc.shapes.map((s) => (ids.has(s.id) ? translate(scaleAbout(s, sx, sy, origin), dx, dy) : s))
+      doc.shapes = doc.shapes.map((s) =>
+        ids.has(s.id) ? translate(scaleAbout(s, sx, sy, origin), dx, dy) : s,
+      )
     },
     selectionAfter: sel,
   }
