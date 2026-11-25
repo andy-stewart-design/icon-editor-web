@@ -29,12 +29,34 @@ function bind(store: ReturnType<typeof createEditorStore>, tool: Tool) {
 
 function setup() {
   const store = createEditorStore(createDefaultDoc())
-  const tool: Tool = createPenTool(store)
+  const tool = createPenTool(store)
   bind(store, tool)
   return { store, tool }
 }
 
 describe('pen tool (AC18, AC19)', () => {
+  it('distinguishes idle hover from a press, provisional point, and committed open drawing', () => {
+    const { tool } = setup()
+    const first = ev(4, 4)
+    const second = ev(12, 4)
+    tool.hover(first)
+    expect(tool.hasActiveDrawing()).toBe(false)
+    tool.pointerDown(first)
+    expect(tool.hasActiveDrawing()).toBe(true)
+    tool.keyDown('Enter')
+    expect(tool.hasActiveDrawing()).toBe(false)
+    tool.pointerUp(first)
+    expect(tool.hasActiveDrawing()).toBe(false)
+    tool.pointerDown(first)
+    tool.pointerUp(first)
+    expect(tool.hasActiveDrawing()).toBe(true)
+    tool.pointerDown(second)
+    tool.pointerUp(second)
+    expect(tool.hasActiveDrawing()).toBe(true)
+    tool.keyDown('Enter')
+    expect(tool.hasActiveDrawing()).toBe(false)
+  })
+
   it('click, click-drag, click, then the first node closes a corner/symmetric/corner path in three entries', () => {
     const { store, tool } = setup()
     tool.pointerDown(ev(4, 4))

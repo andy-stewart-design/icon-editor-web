@@ -58,7 +58,7 @@ function previewPath(nodes: PathNode[]): PathShape {
 export function createPenTool(
   host: ToolHost & Pick<EditorStore, 'getState' | 'setUi'>,
   context: PenContext = { mode: 'shape' },
-): Tool {
+) {
   let destination: Destination | undefined
   let lastHover: ToolEvent | null = null
   let provisional: PathNode | undefined
@@ -228,6 +228,8 @@ export function createPenTool(
 
   return {
     cursor: 'crosshair',
+
+    hasActiveDrawing: () => !!(press || provisional || destination || insertion),
 
     pointerDown(e) {
       if (press || insertion) return
@@ -528,5 +530,5 @@ export function createPenTool(
         out.push(...snapIndicator(targets))
       return out
     },
-  }
+  } satisfies Tool
 }

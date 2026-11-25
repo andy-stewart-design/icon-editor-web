@@ -19,7 +19,7 @@ import {
   type EditorStore,
   type NudgeDir,
 } from '../core'
-import { isEditable } from './editable'
+import { isActivatable, isEditable } from './editable'
 import { useEditorStore } from './use-editor'
 
 // Single source of truth for the app-wide keyboard shortcuts (spec R25, "Keyboard shortcuts").
@@ -44,11 +44,6 @@ type Binding = {
 const hasShapes = (s: Context): boolean => s.selection.shapeIds.length > 0
 const nodeContext = (s: Context): boolean => isNodeSelect(s.ui) && s.selection.nodes.length > 0
 
-// Enter is left alone on buttons, links and selects so a focused toolbar button still activates with Enter.
-// Text fields are excluded earlier by isEditable.
-const ACTIVATABLE_TAGS = new Set(['BUTTON', 'A', 'SELECT'])
-const isActivatable = (target: EventTarget | null): boolean =>
-  target instanceof HTMLElement && ACTIVATABLE_TAGS.has(target.tagName)
 const enterToggles = (s: Context, e: KeyboardEvent): boolean =>
   !isActivatable(e.target) && s.ui.activeTool === 'select' && (s.ui.mode === 'node' || hasShapes(s))
 
@@ -92,7 +87,7 @@ const BINDINGS: readonly Binding[] = [
   tool('l', 'line'),
   tool('r', 'rect'),
   tool('e', 'ellipse'),
-  // Enter toggles Select <-> Node. Enter in the Pen tool finishes the path (use-tool-input).
+  // Enter toggles Select <-> Node. Pen Enter is handled separately by use-tool-input.
   {
     keys: ['enter'],
     shift: 'none',

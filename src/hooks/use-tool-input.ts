@@ -25,7 +25,7 @@ import {
   type Tool,
   type ToolEvent,
 } from '../core'
-import { isEditable } from './editable'
+import { isActivatable, isEditable } from './editable'
 import { useEditorStore } from './use-editor'
 
 // Modifier flags shared by pointer and keyboard events.
@@ -332,9 +332,9 @@ export function useToolInput(): ToolInput {
     }
   }, [store])
 
-  // Window-level keys. Escape cancels the draft (the Pen tool finishes its path instead), and Enter is forwarded
-  // for the Pen tool to finish. Modifier changes during a press re-send the last position so the preview picks up
-  // the new shift, alt, and snap state without the pointer moving.
+  // Window-level keys. Escape cancels the draft (Pen finishes instead). Enter finishes a live Pen
+  // drawing or enters Node mode from idle Shape Pen. Modifier changes during a press update
+  // the preview without the pointer moving.
   useEffect(() => {
     const controller = new AbortController()
     const { signal } = controller
@@ -364,9 +364,23 @@ export function useToolInput(): ToolInput {
         }
         if (e.key === 'Escape' || e.key === 'Enter') {
           if (isEditable(e.target)) return
-          // Select Enter belongs exclusively to the app shortcut table. In Pen, suppress
-          // native activation of a focused toolbar button so finishing cannot also switch context.
-          if (e.key === 'Enter' && ui.activeTool !== 'pen') return
+          // Select Enter belongs exclusively to the app shortcut table.
+          if (e.key === 'Enter') {
+            if (ui.activeTool !== 'pen') return
+            if (
+              !e.repeat &&
+              ui.mode === 'shape' &&
+              !gestureRef.current &&
+              !tool.hasActiveDrawing?.()
+            ) {
+              if (isActivatable(e.target) || e.shiftKey || e.altKey || e.metaKey || e.ctrlKey)
+                return
+              e.preventDefault()
+              store.setUi({ mode: 'node' })
+              return
+            }
+          }
+          // Finishing (including repeats after finishing) must not also activate a focused button.
           if (ui.activeTool === 'pen') e.preventDefault()
           if (e.repeat) return
           const pressed = gestureRef.current !== null

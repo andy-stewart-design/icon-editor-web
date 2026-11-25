@@ -50,6 +50,7 @@ export interface Tool {
   doubleClick?(e: ToolEvent): void
   // 'Escape' cancels the draft without committing, except the Pen tool, which finishes its path. 'Enter' is sent to every tool.
   keyDown(key: string): void
+  hasActiveDrawing?(): boolean
   cycleHandleMode?(): boolean
   overlay(): OverlayPrimitive[]
   // Plain pointer moves with no button held. The host calls it only when the method exists (Select and Pen use it).
