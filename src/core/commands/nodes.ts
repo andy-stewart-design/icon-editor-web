@@ -1,3 +1,4 @@
+import { original } from 'immer'
 import type { Command, Recipe } from '../commands'
 import {
   breakAtNodes,
@@ -326,7 +327,7 @@ export function drawContour(
     label: 'Draw contour',
     recipe: (draft) => {
       const shape = draft.shapes.find((s) => s.id === pinned.id)
-      if (!shape) return
+      if (!shape || original(shape)?.subpaths !== pinned.subpaths) return
       if (index < 0) shape.subpaths.push(next)
       else shape.subpaths[index] = next
     },

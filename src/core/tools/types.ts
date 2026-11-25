@@ -1,7 +1,6 @@
 import type { Command } from '../commands'
 import type { Rect } from '../geometry/bounds'
-import type { Selection } from '../history'
-import type { IconDoc, PathShape, Pt } from '../model'
+import type { PathShape, Pt } from '../model'
 import type { SnapResult } from '../snap'
 
 // Built by the host for each pointer event (see buildSnapFn). It already honors suspendSnap.
@@ -39,9 +38,7 @@ export type ToolHost = {
   dispatch: (command: Command) => void
 }
 
-export type PenContext =
-  | { mode: 'shape' }
-  | { mode: 'node'; getState: () => { doc: IconDoc; selection: Selection } }
+export type PenContext = { mode: 'shape' | 'node' }
 
 export interface Tool {
   readonly cursor: string
@@ -62,4 +59,6 @@ export interface Tool {
   // Called when the host replaces the tool (another tool is selected or the tool is torn down). Tools with work to
   // commit do it here. Other tools leave it out.
   deactivate?(): void
+  beforeHistory?(direction: 'undo' | 'redo'): boolean
+  afterHistory?(applied: boolean): void
 }

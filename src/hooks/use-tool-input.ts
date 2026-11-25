@@ -81,7 +81,7 @@ function createTool(
     case 'shape-pen':
       return createPenTool(store)
     case 'node-pen':
-      return createPenTool(store, { mode: 'node', getState: store.getState })
+      return createPenTool(store, { mode: 'node' })
     case 'shape-select':
       return createSelectTool(store)
     case 'node-select':
@@ -142,6 +142,25 @@ export function useToolInput(): ToolInput {
     }
 
     install()
+    let historyTool: Tool | null = null
+    const unbindHistory = store.bindHistoryInput({
+      before(direction) {
+        const current = toolRef.current
+        if (!current?.beforeHistory) return false
+        historyTool = current
+        releaseGesture(gestureRef)
+        return current.beforeHistory(direction)
+      },
+      after(applied) {
+        const current = historyTool
+        historyTool = null
+        if (!current || current !== toolRef.current) return
+        current.afterHistory?.(applied)
+        const hover = hoverRef.current
+        if (hover) current.hover?.(toolEvent(store, hover.local, hover.mods, spaceRef.current))
+        bump()
+      },
+    })
     // A store transition is synchronous. Retire the old context before exposing the new tool to
     // any event handler, including Pen -> Pen. Finishing may dispatch and notify us recursively.
     const unsubscribe = store.subscribe(() => {
@@ -166,15 +185,24 @@ export function useToolInput(): ToolInput {
         next.ui.viewport !== previous.ui.viewport ||
         next.ui.snapEnabled !== previous.ui.snapEnabled ||
         next.ui.snapIncrement !== previous.ui.snapIncrement
+      const previousDoc = previous.doc
       previous = next
-      if (!refresh || gestureRef.current) return
+      if (!refresh) return
       const current = toolRef.current
+      if (gestureRef.current) {
+        if (current?.beforeHistory && next.doc !== previousDoc) {
+          current.refreshHover?.() // validate a held Pen target against external geometry edits
+          bump()
+        }
+        return
+      }
       const hover = hoverRef.current
       if (hover) current?.hover?.(toolEvent(store, hover.local, hover.mods, spaceRef.current))
       else current?.refreshHover?.()
       bump()
     })
     return () => {
+      unbindHistory()
       unsubscribe()
       retire()
     }
@@ -289,14 +317,15 @@ export function useToolInput(): ToolInput {
       },
       // The browser can release capture slightly before the pointerup that ends the press, at the same position.
       // That is the release, so commit here at this position; the later pointerup finds no gesture and does nothing.
-      // A real cancel goes through onPointerCancel and drops the pending press.
+      // A real cancel (or lost Pen capture with the left button still down) drops the press.
       // After a normal pointerup the gesture is already cleared, so this does nothing.
       onLostPointerCapture(e) {
         const tool = toolRef.current
         const g = gestureRef.current
         if (!tool || !g || e.pointerId !== g.id) return
         releaseGesture(gestureRef)
-        tool.pointerUp(toolEvent(store, localOf(e), e, spaceRef.current))
+        if (tool.beforeHistory && e.buttons & 1) tool.pointerCancel()
+        else tool.pointerUp(toolEvent(store, localOf(e), e, spaceRef.current))
         bump()
       },
     }

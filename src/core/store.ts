@@ -79,6 +79,11 @@ function updateUi(ui: UiState, patch: Partial<UiState>): UiState {
 export type Listener = (doc: IconDoc) => void
 
 // Deliberately omits setState: documents change only through the command API below.
+type HistoryInput = {
+  before: (direction: 'undo' | 'redo') => boolean
+  after: (applied: boolean) => void
+}
+
 export type EditorStore = {
   getState: () => EditorState
   subscribe: (listener: () => void) => () => void
@@ -91,6 +96,7 @@ export type EditorStore = {
   update: (recipe: Recipe) => void
   commit: (selectionAfter?: Selection) => void
   cancel: () => void
+  bindHistoryInput: (input: HistoryInput) => () => void
   undo: () => void
   redo: () => void
   canUndo: () => boolean
@@ -110,6 +116,23 @@ export function createEditorStore(initialDoc: IconDoc): EditorStore {
   const selectionFor = (sel: Selection, doc: IconDoc) =>
     pruneSelection(isNodeSelect(api.getState().ui) ? sel : withoutSegment(sel), doc)
   const commands = createCommands(api, (doc) => listeners.forEach((l) => l(doc)), selectionFor)
+  let historyInput: HistoryInput | undefined
+  let navigating = false
+  const navigate = (direction: 'undo' | 'redo') => {
+    if (navigating) return
+    navigating = true
+    const input = historyInput
+    let applied = false
+    try {
+      applied = !input?.before(direction) && commands[direction]()
+    } finally {
+      try {
+        if (historyInput === input) input?.after(applied)
+      } finally {
+        navigating = false
+      }
+    }
+  }
   return {
     getState: api.getState,
     subscribe: api.subscribe,
@@ -127,6 +150,14 @@ export function createEditorStore(initialDoc: IconDoc): EditorStore {
       })
     },
     ...commands,
+    bindHistoryInput: (input) => {
+      historyInput = input
+      return () => {
+        if (historyInput === input) historyInput = undefined
+      }
+    },
+    undo: () => navigate('undo'),
+    redo: () => navigate('redo'),
     subscribeCommitted: (listener) => {
       listeners.add(listener)
       return () => {

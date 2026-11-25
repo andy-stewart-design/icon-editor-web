@@ -19,14 +19,22 @@ const ev = (x: number, y: number, o: Partial<ToolEvent> = {}): ToolEvent => ({
   ...o,
 })
 
+function bind(store: ReturnType<typeof createEditorStore>, tool: Tool) {
+  store.bindHistoryInput({
+    before: (direction) => tool.beforeHistory?.(direction) ?? false,
+    after: (applied) => tool.afterHistory?.(applied),
+  })
+}
+
 function setup() {
   const store = createEditorStore(createDefaultDoc())
   const tool: Tool = createPenTool(store)
+  bind(store, tool)
   return { store, tool }
 }
 
 describe('pen tool (AC18, AC19)', () => {
-  it('click, click-drag, click, then the first node closes a corner/symmetric/corner path in one entry', () => {
+  it('click, click-drag, click, then the first node closes a corner/symmetric/corner path in three entries', () => {
     const { store, tool } = setup()
     tool.pointerDown(ev(4, 4))
     tool.pointerUp(ev(4, 4))
@@ -36,8 +44,8 @@ describe('pen tool (AC18, AC19)', () => {
     tool.pointerUp(ev(16, 6))
     tool.pointerDown(ev(12, 12))
     tool.pointerUp(ev(12, 12))
-    // Document is unchanged until the path is closed.
-    expect(store.getState().doc.shapes).toHaveLength(0)
+    expect(store.getState().doc.shapes[0].subpaths[0].nodes).toHaveLength(3)
+    expect(store.getState().history.past).toHaveLength(2)
     tool.pointerDown(ev(4.2, 4.1)) // within the close tolerance of the first node
     tool.pointerUp(ev(4.2, 4.1))
 
@@ -53,7 +61,7 @@ describe('pen tool (AC18, AC19)', () => {
     expect(sym.hOut).toEqual({ x: 16, y: 6 })
     expect(sym.hIn).toEqual({ x: 8, y: 2 })
     expect(sp.nodes[0].hOut).toBeUndefined()
-    expect(history.past).toHaveLength(1)
+    expect(history.past).toHaveLength(3)
     expect(selection.shapeIds).toEqual([shape.id])
   })
 
@@ -97,7 +105,7 @@ describe('pen tool (AC18, AC19)', () => {
     expect(history.past).toHaveLength(1)
   })
 
-  it('deactivate commits an open path once, and a second call adds nothing', () => {
+  it('deactivate preserves the released pair without adding history', () => {
     const { store, tool } = setup()
     tool.pointerDown(ev(0, 0))
     tool.pointerUp(ev(0, 0))
@@ -170,10 +178,8 @@ function seeded(mode: 'node' | 'shape' = 'node') {
   const store = createEditorStore(doc)
   const select = (...shapeIds: string[]) => store.setSelection({ shapeIds, nodes: [] })
   select(a.id)
-  const tool =
-    mode === 'shape'
-      ? createPenTool(store)
-      : createPenTool(store, { mode, getState: store.getState })
+  const tool = mode === 'shape' ? createPenTool(store) : createPenTool(store, { mode })
+  bind(store, tool)
   return { store, tool, doc, a, b, select }
 }
 
@@ -330,7 +336,7 @@ describe('Pen drawing contexts', () => {
       const after = store.getState().doc
       expect(after.shapes[0].subpaths.slice(0, 3)).toEqual(old)
       expect(serializeBody(after)).toContain(`M${pt.join(' ')}L22 8Z`)
-      expect(store.getState().history.past).toHaveLength(2)
+      expect(store.getState().history.past).toHaveLength(3)
     },
   )
 
@@ -373,52 +379,131 @@ describe('Pen drawing contexts', () => {
     },
   )
 
-  it.each(['short', 'untouched', 'removed', 'changed'] as const)(
-    'does not dispatch for a %s draft or consume redo',
+  it.each(['shape', 'node'] as const)('isolates provisional history and export in %s', (mode) => {
+    const { store, tool, doc } = seeded(mode)
+    store.updateDoc('Restyle', (d) => {
+      d.shapes[1].style.strokeWidth = 3
+    })
+    store.undo()
+    const before = store.getState()
+    const committed: unknown[] = []
+    store.subscribeCommitted((d) => committed.push(d))
+    click(tool, 4, 9)
+    expect(store.getState()).toBe(before)
+    expect(serializeBody(store.getState().doc)).toBe(serializeBody(doc))
+    expect(tool.overlay()).toContainEqual({ kind: 'anchor', p: { x: 4, y: 9 } })
+    tool.pointerDown(ev(9, 9))
+    store.undo()
+    tool.pointerUp(ev(9, 9))
+    expect(store.getState()).toBe(before)
+    expect(tool.overlay().some((p) => p.kind === 'anchor')).toBe(false)
+    expect(committed).toHaveLength(0)
+    click(tool, 4, 9)
+    store.redo()
+    expect(committed).toHaveLength(1)
+    expect(tool.overlay().some((p) => p.kind === 'anchor')).toBe(false)
+    click(tool, 4, 9)
+    store.redo() // unavailable: keep the provisional point
+    expect(tool.overlay()).toContainEqual({ kind: 'anchor', p: { x: 4, y: 9 } })
+    click(tool, 9, 9)
+    expect(committed).toHaveLength(2)
+    click(tool, 11, 11)
+    tool.keyDown('Escape')
+    expect(committed).toHaveLength(3)
+  })
+
+  it.each(['removed', 'changed'] as const)(
+    'drops a held release when the pinned shape is %s',
     (kind) => {
-      const { store, a, select } = seeded()
-      // In the stale cases undo invalidates the pinned target and leaves a real redo branch.
-      if (kind === 'removed') {
-        store.updateDoc('Remove A', (d) => {
-          d.shapes.shift()
-        })
-        store.updateDoc('Restore A', (d) => {
-          d.shapes.unshift(a)
-        })
-      } else if (kind === 'changed') {
-        store.updateDoc('Move endpoint', (d) => {
-          d.shapes[0].subpaths[0].nodes[1].p.x = 13
-        })
-      } else {
-        store.updateDoc('Restyle', (d) => {
-          d.shapes[1].style.strokeWidth = 3
-        })
-        store.undo()
-      }
-      let dispatches = 0
-      const tool = createPenTool(
-        {
-          dispatch: (cmd) => {
-            dispatches++
-            store.dispatch(cmd)
-          },
-        },
-        { mode: 'node', getState: store.getState },
-      )
-      select('a')
-      click(tool, kind === 'short' ? 5 : 2, 2)
-      if (kind === 'removed' || kind === 'changed') {
-        click(tool, 5, 8)
-        store.undo()
-      }
+      const { store, tool, select } = seeded()
+      click(tool, 12, 2)
+      expect(store.canUndo()).toBe(false)
+      tool.pointerDown(ev(5, 8))
       select('b')
+      store.updateDoc('External edit', (d) => {
+        if (kind === 'removed') d.shapes.shift()
+        else d.shapes[0].subpaths[0].nodes[1].p.x++
+      })
       const before = store.getState()
-      expect(store.canRedo()).toBe(true)
-      tool.keyDown('Enter')
-      expect(dispatches).toBe(0)
+      tool.pointerUp(ev(5, 8))
       expect(store.getState()).toBe(before)
-      store.redo()
-      expect(store.getState().doc).toBe(before.history.future[0].after)
+      expect(tool.overlay().some((p) => p.kind === 'anchor')).toBe(false)
     },
   )
+
+  it.each([2, 12])('follows point Undo and Redo at endpoint x=%s', (x) => {
+    const { store, tool, a } = seeded()
+    const endIndex = (length: number) => (x === 2 ? 0 : length - 1)
+    const contour = () => store.getState().doc.shapes[0].subpaths[0]
+    const endpoint = () => contour().nodes[endIndex(contour().nodes.length)].p
+    click(tool, x, 2)
+    click(tool, 7, 8)
+    tool.pointerDown(ev(9, 9))
+    store.undo()
+    tool.pointerUp(ev(9, 9))
+    expect(contour()).toBe(a.subpaths[0])
+    expect(tool.overlay()).toContainEqual({ kind: 'anchor', p: endpoint() })
+    tool.pointerDown(ev(9, 9))
+    store.redo()
+    tool.pointerUp(ev(9, 9))
+    expect(endpoint()).toEqual({ x: 7, y: 8 })
+    expect(tool.overlay()).toContainEqual({ kind: 'anchor', p: endpoint() })
+    store.undo()
+    click(tool, 8, 8)
+    expect(endpoint()).toEqual({ x: 8, y: 8 })
+    expect(contour().nodes).toHaveLength(3)
+  })
+
+  it('previews only the closing segment and commits fresh start handles together with closure', () => {
+    const { store, tool } = setup()
+    click(tool, 4, 4)
+    click(tool, 9, 4)
+    click(tool, 10, 9)
+    const open = store.getState().doc
+    tool.pointerDown(ev(4, 4))
+    tool.pointerMove(ev(6, 5))
+    const draft = tool.overlay().find((p) => p.kind === 'draft')?.shape.subpaths[0]
+    expect(draft?.nodes.map((n) => n.p)).toEqual([
+      { x: 10, y: 9 },
+      { x: 4, y: 4 },
+    ])
+    expect(draft?.closed).toBe(false)
+    tool.pointerUp(ev(6, 5))
+    const contour = store.getState().doc.shapes[0].subpaths[0]
+    expect(contour.closed).toBe(true)
+    expect(contour.nodes[0].hOut).toEqual({ x: 6, y: 5 })
+    expect(contour.nodes[0].hIn).toEqual({ x: 2, y: 3 })
+    store.undo()
+    expect(store.getState().doc).toBe(open)
+  })
+
+  it('undoing the initial pair leaves Pen idle, including after redo', () => {
+    const { store, tool } = setup()
+    click(tool, 4, 4)
+    click(tool, 8, 4)
+    store.undo()
+    expect(tool.overlay()).toEqual([])
+    expect(store.getState().doc.shapes).toHaveLength(0)
+    store.redo()
+    expect(tool.overlay()).toEqual([])
+    click(tool, 12, 9)
+    expect(store.getState().doc.shapes[0].subpaths[0].nodes).toHaveLength(2)
+  })
+
+  it('applied closure Redo ends an attachment to the reopened contour', () => {
+    const { store, tool, a } = seeded()
+    click(tool, 12, 2)
+    click(tool, 7, 8)
+    click(tool, 2, 2)
+    const contour = () => store.getState().doc.shapes[0].subpaths[0]
+    expect(store.getState().history.past).toHaveLength(2)
+    expect(segmentsOf(contour())[0]).toEqual(segmentsOf(a.subpaths[0])[0])
+    store.undo()
+    expect(contour().closed).toBe(false)
+    click(tool, 7, 8)
+    expect(tool.overlay()).toContainEqual({ kind: 'anchor', p: { x: 7, y: 8 } })
+    store.redo()
+    expect(contour().closed).toBe(true)
+    expect(tool.overlay().some((p) => p.kind === 'anchor')).toBe(false)
+  })
 })
