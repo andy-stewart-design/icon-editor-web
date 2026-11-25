@@ -6,7 +6,8 @@ import type { IconDoc } from './model'
 import type { LoadResult, SaveStatus } from './persistence'
 import type { Size, Viewport } from './viewport'
 
-export type ActiveTool = 'select' | 'node' | 'pen' | 'line' | 'rect' | 'ellipse'
+export type ActiveTool = 'select' | 'pen' | 'line' | 'rect' | 'ellipse'
+export type EditMode = 'shape' | 'node'
 export type SnapIncrement = 1 | 0.5 | 0.25
 
 export type UiState = {
@@ -17,6 +18,7 @@ export type UiState = {
   showKeylines: boolean
   snapEnabled: boolean
   snapIncrement: SnapIncrement
+  mode: EditMode
   activeTool: ActiveTool
   rectRadius: number // corner radius for the Rectangle tool, in doc units; clamped when the rect is built
   artboardResizeMode: ResizeMode // how shapes respond when the artboard size field commits; editor UI only
@@ -43,11 +45,28 @@ export const defaultUi: UiState = {
   showKeylines: false,
   snapEnabled: true,
   snapIncrement: 0.5,
+  mode: 'shape',
   activeTool: 'select',
   rectRadius: 0,
   artboardResizeMode: 'keep',
   saveStatus: 'ok',
   loadNotice: null,
+}
+
+export const isNodeSelect = (ui: Pick<UiState, 'mode' | 'activeTool'>): boolean =>
+  ui.mode === 'node' && ui.activeTool === 'select'
+
+// Routing includes the mode for Select and Pen, but primitives have only a Shape context.
+export const toolContext = ({ mode, activeTool }: Pick<UiState, 'mode' | 'activeTool'>) =>
+  activeTool === 'select' || activeTool === 'pen' ? `${mode}-${activeTool}` as const : activeTool
+
+function updateUi(ui: UiState, patch: Partial<UiState>): UiState {
+  const next = { ...ui, ...patch }
+  if (next.activeTool !== 'select' && next.activeTool !== 'pen') {
+    if (patch.activeTool !== undefined) next.mode = 'shape'
+    else if (next.mode === 'node') next.activeTool = 'select'
+  }
+  return next
 }
 
 export type Listener = (doc: IconDoc) => void
@@ -86,7 +105,7 @@ export function createEditorStore(initialDoc: IconDoc): EditorStore {
     getState: api.getState,
     subscribe: api.subscribe,
     setSelection: (selection) => api.setState({ selection }),
-    setUi: (patch) => api.setState({ ui: { ...api.getState().ui, ...patch } }),
+    setUi: (patch) => api.setState({ ui: updateUi(api.getState().ui, patch) }),
     ...commands,
     subscribeCommitted: (listener) => {
       listeners.add(listener)

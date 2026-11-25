@@ -15,9 +15,10 @@ export default function SelectionOverlay() {
   const ids = useEditor((e) => e.selection.shapeIds)
   const vp = useEditor((e) => e.ui.viewport)
   const tool = useEditor((e) => e.ui.activeTool)
+  const mode = useEditor((e) => e.ui.mode)
   const showHandles = tool === 'select'
   // The Node tool draws its own node display; the shape bounds would only confuse it.
-  if (ids.length === 0 || tool === 'node') return null
+  if (ids.length === 0 || mode === 'node') return null
 
   const picked = new Set(ids)
   const bounds = selectionBounds(doc.shapes.filter((sh) => picked.has(sh.id)))

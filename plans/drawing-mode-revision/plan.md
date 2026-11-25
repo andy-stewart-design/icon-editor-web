@@ -122,12 +122,12 @@ Expected files:
 
 Tasks:
 
-- [ ] Split mode from tool in the editor state and update the toolbar, shortcuts, overlays, and panel together. Default to Shape + Select; `V`/`P` preserve mode, `A` enters Node + Select, and choosing a primitive enters Shape. Preserve eligible Select Enter/idle Escape behavior and avoid activating applicable shortcuts from editable inputs.
-- [ ] Route Node + Select and Node + Pen separately. Preserve Node Select's editing predicates, and give Pen its own finish handling so the same Enter/Escape event cannot also apply a Select transition.
-- [ ] Hand off Pen contexts in order: clear the old gesture, finish the old draft once under its original mode and pinned destination, then allow new input in the next context. Include Pen-to-Pen mode switches and ignore late releases from retired gestures. Do not depend on React cleanup timing alone for this ordering.
-- [ ] Render endpoint affordances and refresh them when selection or geometry changes without pointer movement. Ensure zero/multiple selections do not show a stale resume target, and hover never invokes Node Select or changes the tool.
-- [ ] Add focused core state/routing assertions where the contract is pure; audit all tool discriminants and run the browser checklist below for behavior that requires real event routing. Remove obsolete exclusive Node-tool predicates after the replacement path has been checked.
-- [ ] Satisfy the verification and completion gate below, and record concise evidence.
+- [x] Split mode from tool in the editor state and update the toolbar, shortcuts, overlays, and panel together. Default to Shape + Select; `V`/`P` preserve mode, `A` enters Node + Select, and choosing a primitive enters Shape. Preserve eligible Select Enter/idle Escape behavior and avoid activating applicable shortcuts from editable inputs.
+- [x] Route Node + Select and Node + Pen separately. Preserve Node Select's editing predicates, and give Pen its own finish handling so the same Enter/Escape event cannot also apply a Select transition.
+- [x] Hand off Pen contexts in order: clear the old gesture, finish the old draft once under its original mode and pinned destination, then allow new input in the next context. Include Pen-to-Pen mode switches and ignore late releases from retired gestures. Do not depend on React cleanup timing alone for this ordering.
+- [x] Render endpoint affordances and refresh them when selection or geometry changes without pointer movement. Ensure zero/multiple selections do not show a stale resume target, and hover never invokes Node Select or changes the tool.
+- [x] Add focused core state/routing assertions where the contract is pure; audit all tool discriminants and run the browser checklist below for behavior that requires real event routing. Remove obsolete exclusive Node-tool predicates after the replacement path has been checked.
+- [x] Satisfy the verification and completion gate below, and record concise evidence.
 
 Verification:
 

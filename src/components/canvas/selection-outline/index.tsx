@@ -7,11 +7,11 @@ import s from './styles.module.css'
 // shows the same outline, with its anchors and handles on top. Drawn below the Select tool's bounds and handles and
 // never takes pointer events, so hit testing and drag behavior are unchanged. Never serialized.
 export default function SelectionOutline() {
-  const tool = useEditor((e) => e.ui.activeTool)
+  const showOutline = useEditor((e) => e.ui.activeTool === 'select' || e.ui.mode === 'node')
   const doc = useEditor((e) => e.doc)
   const selection = useEditor((e) => e.selection)
   const vp = useEditor((e) => e.ui.viewport)
-  const shown = (tool === 'select' || tool === 'node') && selection.shapeIds.length > 0
+  const shown = showOutline && selection.shapeIds.length > 0
   const prims = useMemo(() => (shown ? selectionOutline(doc, selection) : []), [shown, doc, selection])
   if (prims.length === 0) return null
 

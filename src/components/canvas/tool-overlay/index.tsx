@@ -85,6 +85,11 @@ export default function ToolOverlay({ primitives }: { primitives: OverlayPrimiti
             </g>
           )
         }
+        if (p.kind === 'penEndpoint' || p.kind === 'penResume') {
+          const c = docToScreen(vp, p.p)
+          const resume = p.kind === 'penResume'
+          return <circle key={i} className={resume ? s.penResume : s.penEndpoint} cx={c.x} cy={c.y} r={resume ? 8 : 4} />
+        }
         if (p.kind === 'closeTarget') {
           const c = docToScreen(vp, p.p)
           return <circle key={i} className={s.closeTarget} cx={c.x} cy={c.y} r={CLOSE_RING_RADIUS} />

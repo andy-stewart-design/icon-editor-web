@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { docToScreen, nodeOverlay } from '../../../core'
+import { isNodeSelect, docToScreen, nodeOverlay } from '../../../core'
 import { useEditor } from '../../../hooks/use-editor'
 import s from './styles.module.css'
 
@@ -11,7 +11,7 @@ const HANDLE_DOT_RADIUS = 3 // screen px
 // pixels at constant size, from the live doc each render. Only shown for the Node tool. Never serialized; the tool
 // overlay draws hover feedback on top.
 export default function NodeOverlay() {
-  const active = useEditor((e) => e.ui.activeTool === 'node')
+  const active = useEditor((e) => isNodeSelect(e.ui))
   const doc = useEditor((e) => e.doc)
   const selection = useEditor((e) => e.selection)
   const vp = useEditor((e) => e.ui.viewport)

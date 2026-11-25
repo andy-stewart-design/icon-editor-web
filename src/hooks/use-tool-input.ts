@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useReducer, useRef, type PointerEvent as ReactPointerEvent } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import {
   buildSnapFn,
   createEllipseTool,
@@ -8,7 +8,8 @@ import {
   createRectTool,
   createSelectTool,
   screenToDoc,
-  type ActiveTool,
+  isNodeSelect,
+  toolContext,
   type EditorStore,
   type OverlayPrimitive,
   type Pt,
@@ -16,7 +17,7 @@ import {
   type ToolEvent,
 } from '../core'
 import { isEditable } from './editable'
-import { useEditor, useEditorStore } from './use-editor'
+import { useEditorStore } from './use-editor'
 
 // Modifier flags shared by pointer and keyboard events.
 type Modifiers = Pick<MouseEvent, 'shiftKey' | 'altKey' | 'metaKey' | 'ctrlKey'>
@@ -30,6 +31,7 @@ export type ToolInput = {
   handlers: {
     onPointerDown: (e: ReactPointerEvent<HTMLDivElement>) => void
     onPointerMove: (e: ReactPointerEvent<HTMLDivElement>) => void
+    onPointerLeave: (e: ReactPointerEvent<HTMLDivElement>) => void
     onPointerUp: (e: ReactPointerEvent<HTMLDivElement>) => void
     onPointerCancel: (e: ReactPointerEvent<HTMLDivElement>) => void
     onLostPointerCapture: (e: ReactPointerEvent<HTMLDivElement>) => void
@@ -45,29 +47,31 @@ const RESEND_KEYS = new Set(MODIFIER_KEYS)
 const isSpace = (e: KeyboardEvent): boolean => e.code === 'Space'
 const shouldResend = (e: KeyboardEvent): boolean => RESEND_KEYS.has(e.key) || isSpace(e)
 
-// Ends a gesture: forgets the press and clears the canvas marker that tells the viewport a draw is in progress.
-function clearGesture(g: Gesture | null): void {
-  if (g) delete g.el.dataset.drawing
+// Forget the gesture before releasing capture: lostpointercapture must not finish it again.
+function releaseGesture(ref: { current: Gesture | null }): void {
+  const g = ref.current
+  ref.current = null
+  if (!g) return
+  delete g.el.dataset.drawing
+  if (g.el.hasPointerCapture(g.id)) g.el.releasePointerCapture(g.id)
 }
 
-// Tools for the activeTool values that have one. Other values have no tool, so pointer input does nothing.
-// The rect radius is captured here; the tool is recreated when it changes.
-function createTool(store: EditorStore, activeTool: ActiveTool, rectRadius: number): Tool | null {
-  switch (activeTool) {
+function createTool(store: EditorStore, context: ReturnType<typeof toolContext>, rectRadius: number): Tool {
+  switch (context) {
     case 'line':
       return createLineTool(store)
     case 'rect':
       return createRectTool({ host: store, radius: () => rectRadius })
     case 'ellipse':
       return createEllipseTool(store)
-    case 'pen':
+    case 'shape-pen':
       return createPenTool(store)
-    case 'select':
+    case 'node-pen':
+      return createPenTool(store, { mode: 'node', getState: store.getState })
+    case 'shape-select':
       return createSelectTool(store)
-    case 'node':
+    case 'node-select':
       return createNodeTool(store)
-    default:
-      return null
   }
 }
 
@@ -92,26 +96,69 @@ function toolEvent(store: EditorStore, local: Pt, mods: Modifiers, space: boolea
 // by bumping a version counter, which re-renders the canvas with fresh primitives.
 export function useToolInput(): ToolInput {
   const store = useEditorStore()
-  const activeTool = useEditor((s) => s.ui.activeTool)
-  // Only the rect tool reads the radius, so other tools are not recreated when it changes.
-  const rectRadius = useEditor((s) => (s.ui.activeTool === 'rect' ? s.ui.rectRadius : 0))
-  const tool = useMemo(() => createTool(store, activeTool, rectRadius), [store, activeTool, rectRadius])
-
+  const [tool, setTool] = useState<Tool | null>(null)
+  const toolRef = useRef<Tool | null>(null)
   const gestureRef = useRef<Gesture | null>(null)
-  // Space is held. Tracked for the whole session, not per tool, so a tool change cannot miss the release.
+  const hoverRef = useRef<{ local: Pt; mods: Modifiers } | null>(null)
+  // Space is tracked for the whole session, so a tool change cannot miss the release.
   const spaceRef = useRef(false)
   const [, bump] = useReducer((n: number) => n + 1, 0)
 
-  // Changing the tool drops any draft in progress and forgets the press it was following.
-  useEffect(
-    () => () => {
-      clearGesture(gestureRef.current)
-      gestureRef.current = null
-      tool?.pointerCancel()
-      tool?.deactivate?.()
-    },
-    [tool],
-  )
+  useLayoutEffect(() => {
+    let previous = store.getState()
+    let context = toolContext(previous.ui)
+    let radius = previous.ui.rectRadius
+    let switching = false
+
+    const install = () => {
+      previous = store.getState()
+      context = toolContext(previous.ui)
+      radius = previous.ui.rectRadius
+      const next = createTool(store, context, radius)
+      toolRef.current = next
+      setTool(next)
+    }
+    const retire = () => {
+      const old = toolRef.current
+      toolRef.current = null
+      hoverRef.current = null
+      releaseGesture(gestureRef)
+      old?.pointerCancel()
+      old?.deactivate?.()
+    }
+
+    install()
+    // A store transition is synchronous. Retire the old context before exposing the new tool to
+    // any event handler, including Pen -> Pen. Finishing may dispatch and notify us recursively.
+    const unsubscribe = store.subscribe(() => {
+      if (switching) return
+      const next = store.getState()
+      if (toolContext(next.ui) !== context || (context === 'rect' && next.ui.rectRadius !== radius)) {
+        switching = true
+        try {
+          retire()
+          install()
+        } finally {
+          switching = false
+        }
+        return
+      }
+      const refresh = next.doc !== previous.doc || next.selection !== previous.selection ||
+        next.ui.viewport !== previous.ui.viewport || next.ui.snapEnabled !== previous.ui.snapEnabled ||
+        next.ui.snapIncrement !== previous.ui.snapIncrement
+      previous = next
+      if (!refresh || gestureRef.current) return
+      const current = toolRef.current
+      const hover = hoverRef.current
+      if (hover) current?.hover?.(toolEvent(store, hover.local, hover.mods, spaceRef.current))
+      else current?.refreshHover?.()
+      bump()
+    })
+    return () => {
+      unsubscribe()
+      retire()
+    }
+  }, [store])
 
   // Space state. Listeners are registered before the tool's keyboard listeners, so spaceRef is already
   // current when a Space event re-sends the pointer position below.
@@ -146,6 +193,7 @@ export function useToolInput(): ToolInput {
 
     return {
       onPointerDown(e) {
+        const tool = toolRef.current
         if (!tool || e.button !== 0 || gestureRef.current) return
         // Viewport pan (middle button or Space drag) owns the pointer. Its listener runs before this one.
         if (e.currentTarget.dataset.pan) return
@@ -154,16 +202,21 @@ export function useToolInput(): ToolInput {
         if (canvasSize.width === 0 || canvasSize.height === 0) return
         e.currentTarget.setPointerCapture(e.pointerId)
         const local = localOf(e)
+        hoverRef.current = null
         gestureRef.current = { id: e.pointerId, local, el: e.currentTarget }
         e.currentTarget.dataset.drawing = 'true'
         tool.pointerDown(toolEvent(store, local, e, spaceRef.current))
         bump()
       },
       onPointerMove(e) {
+        const tool = toolRef.current
         const g = gestureRef.current
         // Plain moves (no press) reach only tools with a hover method: the select highlight and the pen rubber band.
-        if (tool && !g && tool.hover) {
-          tool.hover(toolEvent(store, localOf(e), e, spaceRef.current))
+        if (tool && !g && e.buttons === 0 && tool.hover) {
+          const local = localOf(e)
+          const { altKey, ctrlKey, metaKey, shiftKey } = e
+          hoverRef.current = { local, mods: { altKey, ctrlKey, metaKey, shiftKey } }
+          tool.hover(toolEvent(store, local, e, spaceRef.current))
           bump()
           return
         }
@@ -172,82 +225,69 @@ export function useToolInput(): ToolInput {
         tool.pointerMove(toolEvent(store, g.local, e, spaceRef.current))
         bump()
       },
+      onPointerLeave() {
+        hoverRef.current = null
+        if (gestureRef.current || store.getState().ui.activeTool !== 'pen') return
+        toolRef.current?.pointerCancel()
+        bump()
+      },
       onPointerUp(e) {
+        const tool = toolRef.current
         const g = gestureRef.current
         // Only the left button commits. Releasing another button while the left one is held does not.
         if (!tool || !g || e.pointerId !== g.id || e.button !== 0) return
-        gestureRef.current = null
-        clearGesture(g)
-        if (e.currentTarget.hasPointerCapture(g.id)) e.currentTarget.releasePointerCapture(g.id)
+        releaseGesture(gestureRef)
         tool.pointerUp(toolEvent(store, localOf(e), e, spaceRef.current))
         bump()
       },
       onPointerCancel(e) {
+        const tool = toolRef.current
         const g = gestureRef.current
         if (!tool || !g || e.pointerId !== g.id) return
-        gestureRef.current = null
-        clearGesture(g)
+        releaseGesture(gestureRef)
         tool.pointerCancel()
         bump()
       },
       // The browser can release capture slightly before the pointerup that ends the press, at the same position.
       // That is the release, so commit here at this position; the later pointerup finds no gesture and does nothing.
-      // A real cancel still goes through onPointerCancel and discards the draft.
+      // A real cancel goes through onPointerCancel and drops the pending press.
       // After a normal pointerup the gesture is already cleared, so this does nothing.
       onLostPointerCapture(e) {
+        const tool = toolRef.current
         const g = gestureRef.current
         if (!tool || !g || e.pointerId !== g.id) return
-        gestureRef.current = null
-        clearGesture(g)
+        releaseGesture(gestureRef)
         tool.pointerUp(toolEvent(store, localOf(e), e, spaceRef.current))
         bump()
       },
     }
-  }, [store, tool])
-
-  // Doc changes made without a pointer move (arrow-key nudge, panel edit, undo, redo) can leave the tool's hover
-  // feedback out of date. Refresh it when the doc changes while no press is in progress. Gesture edits are skipped
-  // because the gesture is active. The press-end commit runs after the gesture is cleared, but the tool forgets its
-  // hover point at press start, so that refresh is a no-op. bump() only re-renders and never changes the doc.
-  useEffect(() => {
-    if (!tool?.refreshHover) return
-    let doc = store.getState().doc
-    return store.subscribe(() => {
-      const next = store.getState().doc
-      if (next === doc) return
-      doc = next
-      if (gestureRef.current) return
-      tool.refreshHover?.()
-      bump()
-    })
-  }, [store, tool])
+  }, [store])
 
   // Window-level keys. Escape cancels the draft (the Pen tool finishes its path instead), and Enter is forwarded
   // for the Pen tool to finish. Modifier changes during a press re-send the last position so the preview picks up
   // the new shift, alt, and snap state without the pointer moving.
   useEffect(() => {
-    if (!tool) return
     const controller = new AbortController()
     const { signal } = controller
 
     window.addEventListener(
       'keydown',
       (e) => {
-        // Keys typed into a field belong to the field, so Escape and Enter are not sent to the tool there.
+        const tool = toolRef.current
+        if (!tool) return
+        const { ui } = store.getState()
         if (e.key === 'Escape' || e.key === 'Enter') {
           if (isEditable(e.target)) return
-          if (e.key === 'Enter') {
-            tool.keyDown('Enter')
-            bump()
-            return
-          }
-          // Esc during a press only cancels that drag. With no press, Esc in the Node tool leaves it for Select: the
-          // tool first clears its node selection, so re-entering Node mode doesn't bring old nodes back.
+          // Select Enter belongs exclusively to the app shortcut table. In Pen, suppress
+          // native activation of a focused toolbar button so finishing cannot also switch context.
+          if (e.key === 'Enter' && ui.activeTool !== 'pen') return
+          if (ui.activeTool === 'pen') e.preventDefault()
+          if (e.repeat) return
           const pressed = gestureRef.current !== null
-          clearGesture(gestureRef.current)
-          gestureRef.current = null
-          tool.keyDown('Escape')
-          if (!pressed && store.getState().ui.activeTool === 'node') store.setUi({ activeTool: 'select' })
+          releaseGesture(gestureRef)
+          hoverRef.current = null
+          tool.keyDown(e.key)
+          if (e.key === 'Escape' && !pressed && isNodeSelect(ui)) store.setUi({ mode: 'shape' })
           bump()
           return
         }
@@ -262,6 +302,8 @@ export function useToolInput(): ToolInput {
     window.addEventListener(
       'keyup',
       (e) => {
+        const tool = toolRef.current
+        if (!tool) return
         const g = gestureRef.current
         if (!g || !shouldResend(e)) return
         tool.pointerMove(toolEvent(store, g.local, e, spaceRef.current))
@@ -271,7 +313,7 @@ export function useToolInput(): ToolInput {
     )
 
     return () => controller.abort()
-  }, [store, tool])
+  }, [store])
 
   return {
     handlers,

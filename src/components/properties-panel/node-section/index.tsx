@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import {
+  isNodeSelect,
   nodePanelState,
   setNodePosition,
   setSelectedNodesMode,
@@ -22,7 +23,7 @@ const MODES = [
 // the nodes differ). The mode control sets the mode of every selected node.
 export default function NodeSection() {
   const store = useEditorStore()
-  const active = useEditor((e) => e.ui.activeTool === 'node')
+  const active = useEditor((e) => isNodeSelect(e.ui))
   const doc = useEditor((e) => e.doc)
   const selection = useEditor((e) => e.selection)
 
