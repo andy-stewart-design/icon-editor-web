@@ -4,7 +4,7 @@ import { newId } from '../ids'
 import type { IconDoc, PathShape } from '../model'
 
 // Deep copy with fresh ids for the shape, its subpaths and its nodes.
-function cloneWithNewIds(shape: PathShape): PathShape {
+export function cloneWithNewIds(shape: PathShape): PathShape {
   return {
     ...shape,
     id: newId(),

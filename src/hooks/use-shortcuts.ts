@@ -126,6 +126,9 @@ const BINDINGS: readonly Binding[] = [
   { keys: ['z'], cmd: true, run: (store) => store.undo() },
   { keys: ['z'], cmd: true, shift: 'required', run: (store) => store.redo() },
   { keys: ['a'], cmd: true, run: (store) => store.dispatch(selectAll(store.getState().doc)) },
+  { keys: ['c'], cmd: true, run: (store) => store.clipboard('copy') },
+  { keys: ['x'], cmd: true, run: (store) => store.clipboard('cut') },
+  { keys: ['v'], cmd: true, run: (store) => store.clipboard('paste') },
   // Duplicate is prevented even with nothing selected, so Cmd+D never opens the bookmark dialog.
   {
     keys: ['d'],

@@ -50,13 +50,6 @@ const plainSubpath = (sp: Subpath): Subpath => ({
   nodes: sp.nodes.map(plainNode),
 })
 
-const plainShape = (s: PathShape): PathShape => ({
-  id: s.id,
-  type: s.type,
-  style: { ...s.style },
-  subpaths: s.subpaths.map(plainSubpath),
-})
-
 // Structural equality for plain JSON-like values, independent of key order.
 function sameValue(a: unknown, b: unknown): boolean {
   if (a === b) return true
@@ -227,11 +220,13 @@ export function insertNode(
 export type DeleteNodesMode = 'break' | 'join'
 
 export function deleteSelectedNodes(sel: Selection, mode: DeleteNodesMode): Command {
-  const byShape = new Map<string, Set<string>>()
+  const byShape = new Map<string, Map<string, Set<string>>>()
   for (const r of sel.nodes) {
-    const set = byShape.get(r.shapeId) ?? new Set<string>()
-    set.add(r.nodeId)
-    byShape.set(r.shapeId, set)
+    const paths = byShape.get(r.shapeId) ?? new Map<string, Set<string>>()
+    const ids = paths.get(r.subpathId) ?? new Set<string>()
+    ids.add(r.nodeId)
+    paths.set(r.subpathId, ids)
+    byShape.set(r.shapeId, paths)
   }
   const apply = mode === 'break' ? breakAtNodes : deleteNodes
   return {
@@ -240,19 +235,29 @@ export function deleteSelectedNodes(sel: Selection, mode: DeleteNodesMode): Comm
       let changed = false
       const next: PathShape[] = []
       for (const shape of d.shapes) {
-        const ids = byShape.get(shape.id)
-        if (!ids) {
+        const paths = byShape.get(shape.id)
+        if (!paths) {
           next.push(shape)
           continue
         }
-        const before = plainShape(shape)
-        const after = apply(before, ids)
-        if (after === before) {
-          next.push(shape)
-          continue
+        let touched = false
+        const subpaths = shape.subpaths.flatMap((sp) => {
+          const ids = paths.get(sp.id)
+          if (!ids || !sp.nodes.some((n) => ids.has(n.id))) return [sp]
+          touched = true
+          const before = {
+            id: shape.id,
+            type: shape.type,
+            style: { ...shape.style },
+            subpaths: [plainSubpath(sp)],
+          }
+          return apply(before, ids)?.subpaths ?? []
+        })
+        if (!touched) next.push(shape)
+        else {
+          changed = true
+          if (subpaths.length) next.push({ ...shape, subpaths })
         }
-        changed = true
-        if (after) next.push(after)
       }
       if (changed) d.shapes = next
     },

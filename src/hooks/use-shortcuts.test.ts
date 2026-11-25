@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createDefaultDoc, createEditorStore, screenToDoc } from '../core'
+import { createDefaultDoc, createEditorStore, screenToDoc, type PathShape } from '../core'
 import { makeLine } from '../core/geometry/shapes'
 import { dispatchKey } from './use-shortcuts'
 
@@ -112,5 +112,201 @@ describe.each(['shape', 'node'] as const)('%s nudge shortcuts', (mode) => {
     expect(store.getState().tx).toBe(tx)
     expect(store.getState().history).toBe(history)
     expect(xs()).toEqual([2, 12])
+  })
+})
+
+describe('local clipboard shortcuts', () => {
+  const cmd = { ctrlKey: true }
+  function path(id: string, xs: number[], closed = false) {
+    return {
+      id,
+      type: 'path' as const,
+      style: { strokeWidth: 3, linecap: 'square' as const },
+      subpaths: [
+        {
+          id: `${id}-path`,
+          closed,
+          nodes: xs.map((x) => ({
+            id: `${id}-${x}`,
+            p: { x, y: 5 },
+            mode: 'smooth' as const,
+            hIn: { x: x - 1, y: 5 },
+            hOut: { x: x + 1, y: 5 },
+          })),
+        },
+      ],
+    }
+  }
+  const ref = (shapeId: string, x: number) => ({
+    shapeId,
+    subpathId: `${shapeId}-path`,
+    nodeId: `${shapeId}-${x}`,
+  })
+
+  it('copies snapshots in stacking order, cuts and pastes with independent history and fresh IDs', () => {
+    const a = path('a', [1, 2, 3], true)
+    const b = path('b', [4, 5])
+    const doc = { ...createDefaultDoc(), shapes: [a, b] }
+    const { store, press } = setup(doc)
+    const before = { shapeIds: ['b', 'a'], nodes: [] }
+    store.setSelection(before)
+    press('c', { metaKey: true })
+    expect(store.canUndo()).toBe(false)
+    store.updateDoc('Change style', (draft) => {
+      draft.shapes[0].style.strokeWidth = 9
+    })
+    press('v', cmd)
+    const pasted = store.getState().doc.shapes.slice(2)
+    expect(pasted.map((s) => s.style)).toEqual([a.style, b.style])
+    expect(pasted[0].subpaths[0]).toMatchObject({
+      closed: true,
+      nodes: a.subpaths[0].nodes.map(({ p, hIn, hOut, mode }) => ({ p, hIn, hOut, mode })),
+    })
+    const ids = (s: PathShape) => [
+      s.id,
+      ...s.subpaths.flatMap((sp) => [sp.id, ...sp.nodes.map((n) => n.id)]),
+    ]
+    expect(new Set([a, b, ...pasted].flatMap(ids)).size).toBe(18)
+    expect(store.getState().selection.shapeIds).toEqual(pasted.map((s) => s.id))
+    const after = store.getState().selection
+    store.undo()
+    expect(store.getState().selection).toEqual(before)
+    store.redo()
+    expect(store.getState().selection).toEqual(after)
+    press('x', cmd)
+    expect(store.getState().doc.shapes).toHaveLength(2)
+    expect(store.getState().selection.shapeIds).toEqual([])
+    press('v', cmd)
+    expect(store.getState().selection.shapeIds).not.toEqual(after.shapeIds)
+    store.undo()
+    store.undo()
+    expect(store.getState().selection).toEqual(after)
+  })
+
+  it('keeps the closed seam together, preserves whole contours, and never bridges gaps', () => {
+    const a = path('a', [0, 1, 2, 3, 4, 5, 6, 7], true)
+    const b = path('b', [8, 9, 10], true)
+    const { store, press } = setup({ ...createDefaultDoc(), shapes: [a, b] })
+    store.setUi({ mode: 'node' })
+    store.setSelection({
+      shapeIds: ['b', 'a'],
+      nodes: [
+        ref('a', 0),
+        ref('a', 4),
+        ref('a', 3),
+        ref('a', 7),
+        ref('b', 10),
+        ref('b', 8),
+        ref('b', 9),
+      ],
+    })
+    press('c', cmd)
+    store.setUi({ mode: 'shape', activeTool: 'pen' })
+    press('v', cmd)
+    const { doc, selection, ui } = store.getState()
+    const [pa, pb] = doc.shapes.slice(2)
+    expect(pa.style).toEqual(a.style)
+    expect(pa.subpaths.map((sp) => sp.nodes.map((n) => n.p.x))).toEqual([
+      [7, 0],
+      [3, 4],
+    ])
+    for (const sp of pa.subpaths) {
+      expect(sp.closed).toBe(false)
+      expect(sp.nodes[0].hIn).toBeUndefined()
+      expect(sp.nodes[0].hOut).toBeDefined()
+      expect(sp.nodes[1].hIn).toBeDefined()
+      expect(sp.nodes[1].hOut).toBeUndefined()
+    }
+    expect(pb.subpaths[0].closed).toBe(true)
+    expect(pb.subpaths[0].nodes[0].hIn).toEqual(b.subpaths[0].nodes[0].hIn)
+    expect(selection.shapeIds).toEqual([pa.id, pb.id])
+    expect(selection.nodes).toHaveLength(7)
+    expect(ui).toMatchObject({ mode: 'node', activeTool: 'select' })
+  })
+
+  it('joins cuts and pastes mixed runs atomically, preserving all loose points in path order', () => {
+    const a = path('a', [0, 1, 2, 3, 4, 5, 6, 7])
+    const { store, press } = setup({ ...createDefaultDoc(), shapes: [a] })
+    store.setUi({ mode: 'node' })
+    const before = { shapeIds: ['a'], nodes: [ref('a', 6), ref('a', 4), ref('a', 3), ref('a', 1)] }
+    store.setSelection(before)
+    press('x', cmd)
+    const cut = store.getState()
+    expect(cut.doc.shapes[0].subpaths[0].nodes.map((n) => n.p.x)).toEqual([0, 2, 5, 7])
+    press('v', cmd)
+    expect(store.getState()).toBe(cut)
+    const destination = { shapeIds: ['a'], nodes: [ref('a', 2)] }
+    store.setSelection(destination)
+    press('v', cmd)
+    const { doc, selection, history } = store.getState()
+    const nodes = doc.shapes[0].subpaths[0].nodes
+    expect(nodes.map((n) => n.p.x)).toEqual([0, 2, 1, 6, 5, 7])
+    expect(nodes[2]).toMatchObject({ mode: 'smooth', hIn: { x: 0, y: 5 }, hOut: { x: 2, y: 5 } })
+    expect(nodes[2].id).not.toBe('a-1')
+    expect(doc.shapes[1].subpaths[0].nodes.map((n) => n.p.x)).toEqual([3, 4])
+    expect(selection.nodes).toHaveLength(4)
+    expect(selection.shapeIds).toEqual(['a', doc.shapes[1].id])
+    expect(history.past).toHaveLength(2)
+    store.undo()
+    expect(store.getState().selection).toEqual(destination)
+    store.undo()
+    expect(store.getState().selection).toEqual(before)
+    store.redo()
+    store.redo()
+    expect(store.getState().selection).toEqual(selection)
+  })
+
+  it('does not overwrite a valid clipboard on a last-node cut, stale ref, or segment selection', () => {
+    const a = path('a', [0, 1])
+    const other = path('other', [2, 3])
+    const { store, press } = setup({ ...createDefaultDoc(), shapes: [a, other] })
+    store.setSelection({ shapeIds: ['other'], nodes: [] })
+    press('c', cmd)
+    store.setUi({ mode: 'node' })
+    store.setSelection({ shapeIds: ['a'], nodes: [ref('a', 0)] })
+    const before = store.getState()
+    press('x', cmd)
+    expect(store.getState()).toBe(before)
+    store.setSelection({ shapeIds: ['a'], nodes: [ref('a', 999)] })
+    press('c', cmd)
+    press('x', cmd)
+    store.setSelection({
+      shapeIds: ['a'],
+      nodes: [],
+      segment: { shapeId: 'a', subpathId: 'a-path', fromId: 'a-0', toId: 'a-1' },
+    })
+    expect(store.getState().selection.segment).toBeDefined()
+    press('c', cmd)
+    press('x', cmd)
+    expect(store.canUndo()).toBe(false)
+    press('v', cmd)
+    expect(store.getState().doc.shapes[2].subpaths[0].nodes.map((n) => n.p.x)).toEqual([2, 3])
+    expect(store.getState().selection.segment).toBeUndefined()
+  })
+
+  it('ignores repeats and open gestures, leaves native fields alone, and isolates editors', () => {
+    const a = path('a', [0, 1])
+    const { store, press } = setup({ ...createDefaultDoc(), shapes: [a] })
+    store.setSelection({ shapeIds: ['a'], nodes: [] })
+    for (const key of ['c', 'x', 'v']) {
+      expect(press(key, cmd, new ElementStub())).toBe(false)
+      press(key, { ...cmd, repeat: true })
+    }
+    press('v', cmd)
+    expect(store.canUndo()).toBe(false)
+    store.begin('Gesture')
+    press('c', cmd)
+    press('x', cmd)
+    store.cancel()
+    press('v', cmd)
+    expect(store.canUndo()).toBe(false)
+    press('c', cmd)
+    store.begin('Gesture')
+    press('v', cmd)
+    store.cancel()
+    expect(store.canUndo()).toBe(false)
+    const second = setup()
+    second.press('v', cmd)
+    expect(second.store.getState().doc.shapes).toEqual([])
   })
 })
