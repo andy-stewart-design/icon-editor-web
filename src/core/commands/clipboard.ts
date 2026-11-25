@@ -1,7 +1,7 @@
 import type { Command } from '../commands'
 import { selectionBounds } from '../geometry/bounds'
 import { translate } from '../geometry/transform'
-import type { Selection } from '../history'
+import { resolveSegment, type Selection } from '../history'
 import type { IconDoc, PathNode, PathShape, Pt } from '../model'
 import { cloneWithNewIds, deleteSelection } from './arrange'
 import { deleteSelectedNodes, selectedNodes } from './nodes'
@@ -87,9 +87,19 @@ export function pasteClipboard(
   const points = payload.kind === 'points'
   const hasLoose =
     points && payload.shapes.some((shape) => shape.subpaths.some((sp) => sp.nodes.length === 1))
-  const anchors = hasLoose && nodeSelect ? selectedNodes(doc, sel) : []
-  if (hasLoose && new Set(anchors.map(({ node }) => node)).size !== 1) return
-  const anchor = anchors[0]
+  const pickedNodes = points && nodeSelect ? selectedNodes(doc, sel) : []
+  if (hasLoose && new Set(pickedNodes.map(({ node }) => node)).size !== 1) return
+  const anchor = hasLoose ? pickedNodes[0] : undefined
+  let owner = anchor?.shape
+  if (points && nodeSelect && !anchor) {
+    const explicitIds = new Set(pickedNodes.map(({ shape }) => shape.id))
+    if (sel.segment && resolveSegment(doc, sel.segment)) explicitIds.add(sel.segment.shapeId)
+    const candidates = explicitIds.size ? explicitIds : new Set(sel.shapeIds)
+    const live = doc.shapes.filter((shape) => candidates.has(shape.id))
+    if (live.length > 1) return
+    owner = live[0]
+  }
+  const ownerIndex = owner ? doc.shapes.indexOf(owner) : -1
 
   // Include loose points in the same bounds before splitting them into their destination.
   const bounds = center && selectionBounds(payload.shapes)
@@ -108,35 +118,37 @@ export function pasteClipboard(
           return false
         }
         for (const node of sp.nodes) {
-          selectionAfter.nodes.push({ shapeId: shape.id, subpathId: sp.id, nodeId: node.id })
+          selectionAfter.nodes.push({
+            shapeId: owner?.id ?? shape.id,
+            subpathId: sp.id,
+            nodeId: node.id,
+          })
         }
         return true
       })
       if (!shape.subpaths.length) continue
     }
     shapes.push(shape)
-    selectionAfter.shapeIds.push(shape.id)
+    if (!owner) selectionAfter.shapeIds.push(shape.id)
   }
-  let destination: { shapeIndex: number; subpathIndex: number; insertAt: number } | undefined
-  if (anchor) {
-    const { ref, shape, subpath, node } = anchor
-    destination = {
-      shapeIndex: doc.shapes.indexOf(shape),
-      subpathIndex: shape.subpaths.indexOf(subpath),
-      insertAt: subpath.nodes.indexOf(node) + 1,
-    }
-    selectionAfter.shapeIds.unshift(ref.shapeId)
-    selectionAfter.nodes.unshift(...loose.map((n) => ({ ...ref, nodeId: n.id })))
+  if (owner) selectionAfter.shapeIds.push(owner.id)
+  const contours = owner ? shapes.flatMap((shape) => shape.subpaths) : []
+  const insertion = anchor && {
+    subpathIndex: anchor.shape.subpaths.indexOf(anchor.subpath),
+    index: anchor.subpath.nodes.indexOf(anchor.node) + 1,
   }
+  if (anchor) selectionAfter.nodes.unshift(...loose.map((n) => ({ ...anchor.ref, nodeId: n.id })))
   return {
     label: 'Paste',
     selectionAfter,
     recipe: (draft) => {
-      if (destination) {
-        const { shapeIndex, subpathIndex, insertAt } = destination
-        draft.shapes[shapeIndex].subpaths[subpathIndex].nodes.splice(insertAt, 0, ...loose)
+      if (ownerIndex < 0) {
+        draft.shapes.push(...shapes)
+        return
       }
-      draft.shapes.push(...shapes)
+      const { subpaths } = draft.shapes[ownerIndex]
+      if (insertion) subpaths[insertion.subpathIndex].nodes.splice(insertion.index, 0, ...loose)
+      subpaths.push(...contours)
     },
   }
 }

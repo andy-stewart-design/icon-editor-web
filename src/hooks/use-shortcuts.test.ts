@@ -244,6 +244,91 @@ describe('local clipboard shortcuts', () => {
     expect(ui).toMatchObject({ mode: 'node', activeTool: 'select' })
   })
 
+  it.each(['node', 'segment', 'shape', 'fallback'])(
+    'pastes connected contours using the %s destination rule',
+    (target) => {
+      const a = path('a', [0, 1, 2], true)
+      const b = path('b', [3, 4])
+      const dest = { ...path('dest', [8, 9]), style: { ...a.style, strokeWidth: 8 } }
+      const { store, press } = setup({ ...createDefaultDoc(), shapes: [a, b, dest] })
+      store.setUi({ mode: 'node' })
+      store.setSelection({
+        shapeIds: ['a', 'b'],
+        nodes: [ref('a', 0), ref('a', 1), ref('a', 2), ref('b', 3), ref('b', 4)],
+      })
+      press('c', cmd)
+      for (const nodes of [[], [ref('a', 0), ref('dest', 8)]]) {
+        store.setSelection({ shapeIds: ['a', 'dest'], nodes })
+        const ambiguous = store.getState()
+        press('v', cmd)
+        expect(store.getState()).toBe(ambiguous)
+      }
+      store.setSelection({
+        shapeIds:
+          target === 'fallback'
+            ? ['missing']
+            : target === 'shape'
+              ? ['missing', 'dest']
+              : ['a', 'dest'],
+        nodes: target === 'node' ? [ref('dest', 8)] : [ref('missing', 0)],
+        ...(target === 'segment'
+          ? {
+              nodes: [],
+              segment: {
+                shapeId: 'dest',
+                subpathId: 'dest-path',
+                fromId: 'dest-8',
+                toId: 'dest-9',
+              },
+            }
+          : {}),
+      })
+      // History restores the live part of the selection.
+      const before = store.getState()
+      press('v', cmd)
+      const { doc, selection, history } = store.getState()
+      const standalone = target === 'fallback'
+      expect(doc.shapes).toHaveLength(standalone ? 5 : 3)
+      expect(doc.shapes[2].style).toEqual(dest.style)
+      expect(doc.shapes[2].subpaths[0]).toEqual(dest.subpaths[0])
+      const owners = standalone ? doc.shapes.slice(3) : [doc.shapes[2]]
+      const contours = standalone
+        ? owners.flatMap((shape) => shape.subpaths)
+        : owners[0].subpaths.slice(1)
+      expect(contours.map(({ closed, nodes }) => [closed, nodes.length])).toEqual([
+        [true, 3],
+        [false, 2],
+      ])
+      const ids = (shapes: typeof doc.shapes) =>
+        shapes.flatMap((shape) =>
+          shape.subpaths.flatMap((sp) => [sp.id, ...sp.nodes.map((node) => node.id)]),
+        )
+      const allIds = ids(doc.shapes)
+      expect(new Set(allIds).size).toBe(allIds.length)
+      expect(selection.shapeIds).toEqual(owners.map(({ id }) => id))
+      expect(selection.nodes).toEqual(
+        owners.flatMap((shape) =>
+          shape.subpaths
+            .filter((sp) => contours.includes(sp))
+            .flatMap((sp) =>
+              sp.nodes.map((node) => ({ shapeId: shape.id, subpathId: sp.id, nodeId: node.id })),
+            ),
+        ),
+      )
+      expect(history.past).toHaveLength(1)
+      store.undo()
+      expect(store.getState().doc).toBe(before.doc)
+      expect(store.getState().selection).toEqual({
+        ...before.selection,
+        shapeIds: before.selection.shapeIds.filter((id) => id !== 'missing'),
+        nodes: before.selection.nodes.filter((node) => node.shapeId !== 'missing'),
+      })
+      store.redo()
+      expect(store.getState().doc).toBe(doc)
+      expect(store.getState().selection).toEqual(selection)
+    },
+  )
+
   it('joins cuts and pastes mixed runs atomically, preserving all loose points in path order', () => {
     const a = path('a', [0, 1, 2, 3, 4, 5, 6, 7])
     const { store, press } = setup({ ...createDefaultDoc(), shapes: [a] })
@@ -255,6 +340,10 @@ describe('local clipboard shortcuts', () => {
     expect(cut.doc.shapes[0].subpaths[0].nodes.map((n) => n.p.x)).toEqual([0, 2, 5, 7])
     press('v', cmd)
     expect(store.getState()).toBe(cut)
+    store.setSelection({ shapeIds: ['a'], nodes: [ref('a', 0), ref('a', 2)] })
+    const ambiguous = store.getState()
+    press('v', cmd)
+    expect(store.getState()).toBe(ambiguous)
     const destination = { shapeIds: ['a'], nodes: [ref('a', 2)] }
     store.setSelection(destination)
     press('v', cmd)
@@ -268,16 +357,19 @@ describe('local clipboard shortcuts', () => {
       hOut: { x: 61, y: 56.25 },
     })
     expect(nodes[2].id).not.toBe('a-1')
-    expect(doc.shapes[1].subpaths[0].nodes.map((n) => n.p.x)).toEqual([62, 63])
+    expect(doc.shapes).toHaveLength(1)
+    expect(doc.shapes[0].subpaths[1].nodes.map((n) => n.p.x)).toEqual([62, 63])
     expect(selection.nodes).toHaveLength(4)
-    expect(selection.shapeIds).toEqual(['a', doc.shapes[1].id])
+    expect(selection.shapeIds).toEqual(['a'])
     expect(history.past).toHaveLength(2)
     store.undo()
+    expect(store.getState().doc).toBe(cut.doc)
     expect(store.getState().selection).toEqual(destination)
     store.undo()
     expect(store.getState().selection).toEqual(before)
     store.redo()
     store.redo()
+    expect(store.getState().doc).toBe(doc)
     expect(store.getState().selection).toEqual(selection)
   })
 
