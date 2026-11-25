@@ -1,3 +1,4 @@
+import { original } from 'immer'
 import type { Command, Recipe } from '../commands'
 import {
   breakAtNodes,
@@ -112,10 +113,15 @@ export function moveNodesRecipe(refs: readonly NodeRef[], dx: number, dy: number
 }
 
 // Moves one handle of a node to pt. The node's mode is applied to the opposite handle (see moveHandle).
-export function setNodeHandleRecipe(ref: NodeRef, which: 'in' | 'out', pt: Pt): Recipe {
+export function setNodeHandleRecipe(
+  ref: NodeRef,
+  which: 'in' | 'out',
+  pt: Pt,
+  modeBasis?: PathNode,
+): Recipe {
   return editSubpaths([ref], (sp, ids) => ({
     ...sp,
-    nodes: sp.nodes.map((n) => (ids.has(n.id) ? moveHandle(n, which, pt) : n)),
+    nodes: sp.nodes.map((n) => (ids.has(n.id) ? moveHandle(modeBasis ?? n, which, pt) : n)),
   }))
 }
 
@@ -317,19 +323,20 @@ export function drawContour(
   pinned: PathShape,
   next: Subpath,
   previous?: Subpath,
+  edit: 'draw' | 'continuation' = 'draw',
 ): Command | null {
   const target = doc.shapes.find((s) => s.id === pinned.id)
   if (!target || target.subpaths !== pinned.subpaths || next === previous) return null
   const index = previous ? target.subpaths.indexOf(previous) : -1
   if (previous && index < 0) return null
   return {
-    label: 'Draw contour',
+    label: edit === 'continuation' ? 'Set continuation handle' : 'Draw contour',
     recipe: (draft) => {
       const shape = draft.shapes.find((s) => s.id === pinned.id)
-      if (!shape) return
+      if (!shape || original(shape)?.subpaths !== pinned.subpaths) return
       if (index < 0) shape.subpaths.push(next)
       else shape.subpaths[index] = next
     },
-    selectionAfter: { shapeIds: [pinned.id], nodes: [] },
+    selectionAfter: edit === 'draw' ? { shapeIds: [pinned.id], nodes: [] } : undefined,
   }
 }

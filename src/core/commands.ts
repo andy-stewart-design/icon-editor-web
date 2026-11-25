@@ -88,10 +88,10 @@ export function createCommands(
     notify(doc)
   }
 
-  const undo = (): void => {
+  const undo = () => {
     cancel()
     const step = stepBack(api.getState().history)
-    if (!step) return
+    if (!step) return false
     const { entry } = step
     api.setState({
       doc: entry.before,
@@ -99,12 +99,13 @@ export function createCommands(
       history: step.history,
     })
     notify(entry.before)
+    return true
   }
 
-  const redo = (): void => {
+  const redo = () => {
     cancel()
     const step = stepForward(api.getState().history)
-    if (!step) return
+    if (!step) return false
     const { entry } = step
     api.setState({
       doc: entry.after,
@@ -112,6 +113,7 @@ export function createCommands(
       history: step.history,
     })
     notify(entry.after)
+    return true
   }
 
   return {

@@ -2,6 +2,7 @@
 
 - Speak in plain language. Avoid jargon and unnecessarily technical or loaded descriptors.
 - When asking questions, ask them one at a time.
+- Always run `pnpm check`/`pnpm lint`/`pnpm format` before completing your work.
 
 **When working in typescript:**
 

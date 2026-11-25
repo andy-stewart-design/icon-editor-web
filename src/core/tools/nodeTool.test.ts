@@ -134,6 +134,74 @@ describe('node tool: handle drag (AC21)', () => {
     expect(store.getState().history.past[0].label).toBe('Move handle')
   })
 
+  it('cycles an outgoing drag using the live opposite, updates the scene, and undoes as one gesture', () => {
+    const node = n(
+      { x: 12, y: 12 },
+      {
+        mode: 'symmetric',
+        hIn: { x: 9, y: 12 },
+        hOut: { x: 15, y: 12 },
+      },
+    )
+    const s = shape([n({ x: 2, y: 12 }), node, n({ x: 22, y: 12 })])
+    const selection = { shapeIds: [s.id], nodes: [refOf(s, node)] }
+    const { store, tool } = setup([s], selection)
+    const state = store.getState
+    const current = () => nodeOf(store, s, node.id)
+    const before = state().doc
+    tool.pointerDown(ev(15, 12))
+    expect(tool.cycleHandleMode?.()).toBe(false)
+    tool.pointerMove(ev(18, 12))
+    expect(tool.cycleHandleMode?.()).toBe(true)
+    expect(current()).toMatchObject({ mode: 'smooth', hIn: { x: 6, y: 12 } })
+    tool.pointerMove(ev(12, 16))
+    expect(current().hIn).toEqual({ x: 12, y: 6 })
+    tool.cycleHandleMode?.()
+    tool.pointerMove(ev(15, 12))
+    expect(current()).toMatchObject({ mode: 'corner', hIn: { x: 12, y: 6 } })
+    tool.cycleHandleMode?.()
+    expect(current()).toMatchObject({ mode: 'symmetric', hIn: { x: 9, y: 12 } })
+    expect(nodeOverlay(state().doc, state().selection)).toContainEqual({
+      kind: 'handle',
+      from: node.p,
+      to: { x: 9, y: 12 },
+    })
+    expect(state().history.past).toHaveLength(0)
+    tool.pointerUp(ev(15, 12))
+    expect(state().doc).toBe(before) // Back at the original geometry and mode: no entry.
+    expect(state().history.past).toHaveLength(0)
+    tool.pointerDown(ev(15, 12))
+    tool.pointerMove(ev(18, 12))
+    tool.cycleHandleMode?.()
+    tool.pointerUp(ev(18, 12))
+    expect(state().history.past).toHaveLength(1)
+    expect(state().selection).toEqual(selection)
+    store.undo()
+    expect(state().doc).toEqual(before)
+    expect(state().selection).toEqual(selection)
+  })
+
+  it.each([undefined, { x: 12, y: 12 }])(
+    'cancels an incoming Free drag with opposite %j',
+    (hOut) => {
+      const node = n({ x: 12, y: 12 }, { hIn: { x: 9, y: 12 }, ...(hOut && { hOut }) })
+      const s = shape([n({ x: 2, y: 12 }), node, n({ x: 22, y: 12 })])
+      const selection = { shapeIds: [s.id], nodes: [refOf(s, node)] }
+      const { store, tool } = setup([s], selection)
+      const before = store.getState().doc
+      tool.pointerDown(ev(9, 12))
+      tool.pointerMove(ev(12, 8))
+      expect(nodeOf(store, s, node.id).hOut).toEqual(hOut)
+      expect(tool.cycleHandleMode?.()).toBe(true)
+      expect(nodeOf(store, s, node.id)).toMatchObject({ mode: 'symmetric', hOut: { x: 12, y: 16 } })
+      tool.keyDown('Escape')
+      expect(store.getState().doc).toBe(before)
+      expect(store.getState().selection).toEqual(selection)
+      expect(store.getState().history.past).toHaveLength(0)
+      expect(tool.cycleHandleMode?.()).toBe(false)
+    },
+  )
+
   it('smooth keeps the opposite handle length and direction-opposed', () => {
     const endA = n({ x: 2, y: 12 })
     const smooth = n(

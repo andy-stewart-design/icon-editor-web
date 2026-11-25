@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, type CSSProperties } from 'react'
+import { useLayoutEffect, useMemo, useRef, type CSSProperties } from 'react'
 import { fitViewport } from '../../core'
 import { useEditor, useEditorStore } from '../../hooks/use-editor'
 import { useToolInput } from '../../hooks/use-tool-input'
@@ -18,6 +18,24 @@ export default function Canvas() {
   useViewportInput(ref)
   // Tool handlers coexist with the viewport handlers: viewport pan takes the pointer when it starts first.
   const tools = useToolInput()
+  const doc = useEditor((st) => st.doc)
+  const preview = tools.primitives.find((p) => p.kind === 'contourPreview')
+  // Use the same temporary geometry for the styled path and its selection outline.
+  // Nothing outside these render layers reads the preview as document state.
+  const displayDoc = useMemo(() => {
+    if (!preview) return doc
+    return {
+      ...doc,
+      shapes: doc.shapes.map((shape) =>
+        shape.id === preview.shapeId && shape.subpaths.includes(preview.previous)
+          ? {
+              ...shape,
+              subpaths: shape.subpaths.map((sp) => (sp === preview.previous ? preview.next : sp)),
+            }
+          : shape,
+      ),
+    }
+  }, [doc, preview])
   // The first non-zero measurement always fits the artboard, so a measured canvas means a fitted view.
   // Layers stay unrendered until then, so the default viewport never paints.
   const ready = useEditor((st) => st.ui.canvasSize.width > 0 && st.ui.canvasSize.height > 0)
@@ -60,8 +78,8 @@ export default function Canvas() {
         <>
           <GridLayer />
           <KeylineLayer />
-          <ContentLayer />
-          <SelectionOutline />
+          <ContentLayer doc={displayDoc} />
+          <SelectionOutline doc={displayDoc} />
           <SelectionOverlay />
           <NodeOverlay />
           <ToolOverlay primitives={tools.primitives} />

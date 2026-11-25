@@ -126,6 +126,33 @@ describe('editor store history', () => {
     expect(notified).toBe(0)
   })
 
+  it('retires bound input before navigation and blocks reentrant history calls', () => {
+    const store = createEditorStore(baseDoc())
+    store.updateDoc('Add A', addShape('A'))
+    store.updateDoc('Add B', addShape('B'))
+    const calls: unknown[] = []
+    const unbind = store.bindHistoryInput({
+      before(direction) {
+        calls.push([direction, store.getState().history.past.length])
+        store.undo()
+        return false
+      },
+      after(applied) {
+        calls.push([applied, store.getState().history.past.length])
+        store.redo()
+      },
+    })
+    store.undo()
+    expect(calls).toEqual([
+      ['undo', 2],
+      [true, 1],
+    ])
+    unbind()
+    store.redo()
+    expect(store.getState().history.past).toHaveLength(2)
+    expect(calls).toHaveLength(2)
+  })
+
   it('undo during an open transaction cancels it first, then undoes the previous entry', () => {
     const store = createEditorStore(baseDoc())
     store.updateDoc('Add A', addShape('A'))

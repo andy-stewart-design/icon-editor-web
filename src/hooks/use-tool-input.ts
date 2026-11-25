@@ -25,7 +25,7 @@ import {
   type Tool,
   type ToolEvent,
 } from '../core'
-import { isEditable } from './editable'
+import { isActivatable, isEditable } from './editable'
 import { useEditorStore } from './use-editor'
 
 // Modifier flags shared by pointer and keyboard events.
@@ -81,7 +81,7 @@ function createTool(
     case 'shape-pen':
       return createPenTool(store)
     case 'node-pen':
-      return createPenTool(store, { mode: 'node', getState: store.getState })
+      return createPenTool(store, { mode: 'node' })
     case 'shape-select':
       return createSelectTool(store)
     case 'node-select':
@@ -142,6 +142,26 @@ export function useToolInput(): ToolInput {
     }
 
     install()
+    let historyTool: Tool | null = null
+    const unbindHistory = store.bindHistoryInput({
+      before(direction) {
+        const current = toolRef.current
+        if (!current?.beforeHistory) return false
+        historyTool = current
+        releaseGesture(gestureRef)
+        return current.beforeHistory(direction)
+      },
+      after(applied, direction) {
+        const current = historyTool
+        historyTool = null
+        if (!current || current !== toolRef.current) return
+        current.afterHistory?.(applied, direction)
+        if (current !== toolRef.current) return
+        const hover = hoverRef.current
+        if (hover) current.hover?.(toolEvent(store, hover.local, hover.mods, spaceRef.current))
+        bump()
+      },
+    })
     // A store transition is synchronous. Retire the old context before exposing the new tool to
     // any event handler, including Pen -> Pen. Finishing may dispatch and notify us recursively.
     const unsubscribe = store.subscribe(() => {
@@ -166,15 +186,24 @@ export function useToolInput(): ToolInput {
         next.ui.viewport !== previous.ui.viewport ||
         next.ui.snapEnabled !== previous.ui.snapEnabled ||
         next.ui.snapIncrement !== previous.ui.snapIncrement
+      const previousDoc = previous.doc
       previous = next
-      if (!refresh || gestureRef.current) return
+      if (!refresh) return
       const current = toolRef.current
+      if (gestureRef.current) {
+        if (current?.beforeHistory && next.doc !== previousDoc) {
+          current.refreshHover?.() // validate a held Pen target against external geometry edits
+          bump()
+        }
+        return
+      }
       const hover = hoverRef.current
       if (hover) current?.hover?.(toolEvent(store, hover.local, hover.mods, spaceRef.current))
       else current?.refreshHover?.()
       bump()
     })
     return () => {
+      unbindHistory()
       unsubscribe()
       retire()
     }
@@ -289,22 +318,23 @@ export function useToolInput(): ToolInput {
       },
       // The browser can release capture slightly before the pointerup that ends the press, at the same position.
       // That is the release, so commit here at this position; the later pointerup finds no gesture and does nothing.
-      // A real cancel goes through onPointerCancel and drops the pending press.
+      // A real cancel (or lost Pen capture with the left button still down) drops the press.
       // After a normal pointerup the gesture is already cleared, so this does nothing.
       onLostPointerCapture(e) {
         const tool = toolRef.current
         const g = gestureRef.current
         if (!tool || !g || e.pointerId !== g.id) return
         releaseGesture(gestureRef)
-        tool.pointerUp(toolEvent(store, localOf(e), e, spaceRef.current))
+        if (tool.beforeHistory && e.buttons & 1) tool.pointerCancel()
+        else tool.pointerUp(toolEvent(store, localOf(e), e, spaceRef.current))
         bump()
       },
     }
   }, [store])
 
-  // Window-level keys. Escape cancels the draft (the Pen tool finishes its path instead), and Enter is forwarded
-  // for the Pen tool to finish. Modifier changes during a press re-send the last position so the preview picks up
-  // the new shift, alt, and snap state without the pointer moving.
+  // Window-level keys. Escape cancels the draft (Pen finishes instead). Enter finishes a live Pen
+  // drawing or enters Node mode from idle Shape Pen. Modifier changes during a press update
+  // the preview without the pointer moving.
   useEffect(() => {
     const controller = new AbortController()
     const { signal } = controller
@@ -315,11 +345,42 @@ export function useToolInput(): ToolInput {
         const tool = toolRef.current
         if (!tool) return
         const { ui } = store.getState()
+        if (
+          e.key.toLowerCase() === 'm' &&
+          gestureRef.current &&
+          !e.repeat &&
+          !e.metaKey &&
+          !e.ctrlKey &&
+          !e.altKey &&
+          !e.shiftKey &&
+          !spaceRef.current &&
+          !gestureRef.current.el.dataset.pan &&
+          !isEditable(e.target) &&
+          tool.cycleHandleMode?.()
+        ) {
+          e.preventDefault()
+          bump()
+          return
+        }
         if (e.key === 'Escape' || e.key === 'Enter') {
           if (isEditable(e.target)) return
-          // Select Enter belongs exclusively to the app shortcut table. In Pen, suppress
-          // native activation of a focused toolbar button so finishing cannot also switch context.
-          if (e.key === 'Enter' && ui.activeTool !== 'pen') return
+          // Select Enter belongs exclusively to the app shortcut table.
+          if (e.key === 'Enter') {
+            if (ui.activeTool !== 'pen') return
+            if (
+              !e.repeat &&
+              ui.mode === 'shape' &&
+              !gestureRef.current &&
+              !tool.hasActiveDrawing?.()
+            ) {
+              if (isActivatable(e.target) || e.shiftKey || e.altKey || e.metaKey || e.ctrlKey)
+                return
+              e.preventDefault()
+              store.setUi({ mode: 'node' })
+              return
+            }
+          }
+          // Finishing (including repeats after finishing) must not also activate a focused button.
           if (ui.activeTool === 'pen') e.preventDefault()
           if (e.repeat) return
           const pressed = gestureRef.current !== null
