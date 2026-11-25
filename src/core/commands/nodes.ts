@@ -318,19 +318,20 @@ export function drawContour(
   pinned: PathShape,
   next: Subpath,
   previous?: Subpath,
+  edit: 'draw' | 'continuation' = 'draw',
 ): Command | null {
   const target = doc.shapes.find((s) => s.id === pinned.id)
   if (!target || target.subpaths !== pinned.subpaths || next === previous) return null
   const index = previous ? target.subpaths.indexOf(previous) : -1
   if (previous && index < 0) return null
   return {
-    label: 'Draw contour',
+    label: edit === 'continuation' ? 'Set continuation handle' : 'Draw contour',
     recipe: (draft) => {
       const shape = draft.shapes.find((s) => s.id === pinned.id)
       if (!shape || original(shape)?.subpaths !== pinned.subpaths) return
       if (index < 0) shape.subpaths.push(next)
       else shape.subpaths[index] = next
     },
-    selectionAfter: { shapeIds: [pinned.id], nodes: [] },
+    selectionAfter: edit === 'draw' ? { shapeIds: [pinned.id], nodes: [] } : undefined,
   }
 }

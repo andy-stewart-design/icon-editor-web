@@ -4,7 +4,12 @@ import type { PathNode, PathShape, Pt, Subpath } from '../model'
 import { toolContext, type EditorStore } from '../store'
 import type { SnapResult } from '../snap'
 import { addShapeCommand, snapIndicator } from './dragTool'
-import { extendPenContour, idlePenTarget, resolvePenEndpoint } from './penTarget'
+import {
+  extendPenContour,
+  idlePenTarget,
+  resolvePenEndpoint,
+  withContinuationHandle,
+} from './penTarget'
 import { DRAG_THRESHOLD_PX, HIT_TOLERANCE_PX } from './selectTool'
 import type { OverlayPrimitive, PenContext, Tool, ToolEvent, ToolHost } from './types'
 
@@ -12,8 +17,8 @@ type Endpoint = NonNullable<ReturnType<typeof resolvePenEndpoint>>
 type Destination = { shape: PathShape; endpoint: Endpoint | null }
 type Targets = SnapResult['targets']
 
-// A pending first press carries its destination until release. Resuming and closing an existing
-// contour do not place or modify an anchor; other drags pull the outgoing handle after the dead zone.
+// A pending first press carries its destination until release. Resuming pulls only the continuation
+// handle; closing a resumed contour does not modify either endpoint.
 type Press = {
   start?: Destination
   node: PathNode
@@ -135,13 +140,18 @@ export function createPenTool(
     destination = { shape, endpoint: { subpath, end, node } }
   }
 
-  const commit = (contour: Subpath, e: ToolEvent, newShape?: PathShape) => {
+  const commit = (
+    contour: Subpath,
+    e: ToolEvent,
+    newShape?: PathShape,
+    edit: 'draw' | 'continuation' = 'draw',
+  ) => {
     const pinned = destination
     const shapeId = newShape?.id ?? pinned?.shape.id
     const { doc, tx } = host.getState()
     const command = newShape
       ? addShapeCommand('Draw path', newShape)
-      : pinned && drawContour(doc, pinned.shape, contour, pinned.endpoint?.subpath)
+      : pinned && drawContour(doc, pinned.shape, contour, pinned.endpoint?.subpath, edit)
     if (!shapeId || !command || tx) {
       finish()
       return
@@ -175,7 +185,7 @@ export function createPenTool(
       return
     }
     const p = press
-    if (!p || p.start?.endpoint || (p.closing && !fresh)) return
+    if (!p || (p.closing && !fresh)) return
     if (
       !p.dragged &&
       Math.hypot(e.pt.x - p.origin.x, e.pt.y - p.origin.y) * e.zoom >= DRAG_THRESHOLD_PX
@@ -267,6 +277,14 @@ export function createPenTool(
       press = null
       if (p.start) destination = p.start
       if (p.start?.endpoint) {
+        const { node, end, subpath } = p.start.endpoint
+        const next = p.handle ? withContinuationHandle(node, end, p.handle) : node
+        if (next !== node) {
+          const nodes = subpath.nodes.slice()
+          nodes[end === 'head' ? 0 : nodes.length - 1] = next
+          commit({ ...subpath, nodes }, e, undefined, 'continuation')
+          return
+        }
         track(e)
         return
       }
@@ -429,10 +447,12 @@ export function createPenTool(
       }
 
       const handleNodes = [
-        placed[placed.length - 1],
+        press?.start?.endpoint ? null : placed[placed.length - 1],
         pending && press?.dragged ? pending : null,
         first,
       ]
+      if (press?.start?.endpoint && press.handle)
+        out.push({ kind: 'handle', from: press.node.p, to: press.handle })
       for (const n of handleNodes) {
         if (!n) continue
         if (n.hIn) out.push({ kind: 'handle', from: n.p, to: n.hIn })

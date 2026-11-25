@@ -54,7 +54,7 @@ Tasks:
 - [x] Pin the shape/contour and drawing end. Validate the target at release, update the guard after the Pen’s own commits, and never fall back to the current selection or overwrite an external geometry edit. Keep the fresh/resumed distinction after the initial pair becomes committed.
 - [x] Coordinate history through the shared store entry point. Retire an in-flight Pen press before navigation, clearing gesture ownership before releasing pointer capture. Consume provisional Undo locally. After an applied document step, resolve the same contour and end in the restored document; discard provisional state on applied Redo, and leave Pen idle if the contour disappeared, closed, or was not already attached. Ignore late release events from canceled presses.
 - [x] Replace finish-time test expectations with release-time assertions. Cover both modes, provisional stack and export isolation, point and closure granularity, direction after Undo/Redo, pinned and invalid targets, canceled presses, and history-free resume click. Verify both command results and Pen attachment with the existing real-store harness.
-- [ ] Satisfy the verification and completion gate below, and record concise evidence.
+- [x] Satisfy the verification and completion gate below, and record concise evidence.
 
 Verification:
 
@@ -91,11 +91,11 @@ Expected files:
 
 Tasks:
 
-- [ ] Give an endpoint resume press the existing Pen drag threshold and snapping. Preview the continuation handle as it is pulled; a below-threshold release still just attaches.
-- [ ] Commit `Free` and only the future-facing handle (`hOut` at the tail, `hIn` at the head) on release. Check the exact target and mode/handle coordinates before writing, so stale presses or an identical drag on a Free endpoint do not change history. Preserve the anchor, other handle, all existing segments, and unrelated shapes.
-- [ ] Continue the session from the committed handle. Use the same orientation for immediate preview and a later resume. Canceling the press or finishing before release drops the preview without a write; finishing after a valid release leaves it committed.
-- [ ] Add tests that compare prior segment geometry at both ends, verify opposite-handle preservation and mode restoration on Undo/Redo, and cover click, cancel, finish during drag, unchanged drag, and using the saved handle on resume.
-- [ ] Satisfy the verification and completion gate below, and record concise evidence.
+- [x] Give an endpoint resume press the existing Pen drag threshold and snapping. Preview the continuation handle as it is pulled; a below-threshold release still just attaches.
+- [x] Commit `Free` and only the future-facing handle (`hOut` at the tail, `hIn` at the head) on release. Check the exact target and mode/handle coordinates before writing, so stale presses or an identical drag on a Free endpoint do not change history. Preserve the anchor, other handle, all existing segments, and unrelated shapes.
+- [x] Continue the session from the committed handle. Use the same orientation for immediate preview and a later resume. Canceling the press or finishing before release drops the preview without a write; finishing after a valid release leaves it committed.
+- [x] Add tests that compare prior segment geometry at both ends, verify opposite-handle preservation and mode restoration on Undo/Redo, and cover click, cancel, finish during drag, unchanged drag, and using the saved handle on resume.
+- [x] Satisfy the verification and completion gate below, and record concise evidence.
 
 Verification:
 

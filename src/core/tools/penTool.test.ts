@@ -3,6 +3,7 @@ import { segmentsOf } from '../geometry/segments'
 import { serializeBody } from '../serialize'
 import { createDefaultDoc, type PathShape } from '../model'
 import { createEditorStore, toolContext } from '../store'
+import { createNodeTool, nodeOverlay } from './nodeTool'
 import { createPenTool } from './penTool'
 import type { SnapFn, Tool, ToolEvent } from './types'
 
@@ -137,8 +138,8 @@ function seeded(mode: 'node' | 'shape' = 'node') {
         id: 'curve',
         closed: false,
         nodes: [
-          { id: 'head', p: { x: 2, y: 2 }, hOut: { x: 4, y: 5 }, mode: 'corner' },
-          { id: 'tail', p: { x: 12, y: 2 }, hIn: { x: 10, y: 5 }, mode: 'corner' },
+          { id: 'head', p: { x: 2, y: 2 }, hOut: { x: 4, y: 5 }, mode: 'symmetric' },
+          { id: 'tail', p: { x: 12, y: 2 }, hIn: { x: 10, y: 5 }, mode: 'symmetric' },
         ],
       },
       {
@@ -211,7 +212,7 @@ describe('Pen drawing contexts', () => {
       tool.hover?.(start)
       expect(tool.overlay()).toContainEqual({ kind: 'penResume', p: { x, y: 2 } })
       tool.pointerDown(start)
-      tool.pointerUp(ev(x, 6)) // dragging the old endpoint must not change its geometry
+      tool.pointerUp(start) // a plain resume click leaves geometry unchanged
       tool.pointerDown(ev(7, 8))
       tool.pointerMove(ev(8, 10))
       const draft = tool.overlay().find((p) => p.kind === 'draft')
@@ -239,6 +240,56 @@ describe('Pen drawing contexts', () => {
       expect(store.getState().doc).toBe(doc)
       store.redo()
       expect(store.getState().doc).toBe(after)
+    },
+  )
+
+  it.each(['head', 'tail'] as const)(
+    'keeps the original %s curve unchanged when Node Select moves the saved continuation handle',
+    (end) => {
+      const { store, tool, a } = seeded()
+      const head = end === 'head'
+      const x = head ? 2 : 12
+      const side = head ? 'hIn' : 'hOut'
+      const endpoint = a.subpaths[0].nodes[head ? 0 : 1]
+      expect(endpoint.mode).toBe('symmetric')
+      const contour = () => store.getState().doc.shapes[0].subpaths[0]
+      const node = () => contour().nodes.find((n) => n.id === endpoint.id)
+
+      tool.pointerDown(ev(x, 2))
+      tool.pointerMove(ev(x, 6))
+      tool.pointerUp(ev(x, 6))
+      const saved = { ...endpoint, mode: 'corner', [side]: { x, y: 6 } }
+      expect(node()).toEqual(saved)
+      click(tool, 7, 9)
+      tool.keyDown('Enter')
+      tool.deactivate?.()
+      store.setUi({ activeTool: 'select' })
+      expect(toolContext(store.getState().ui)).toBe('node-select')
+      const select = createNodeTool(store)
+      click(select, x, 2)
+      const overlay = () => nodeOverlay(store.getState().doc, store.getState().selection)
+      expect(overlay()).toContainEqual({ kind: 'handle', from: endpoint.p, to: { x, y: 6 } })
+
+      const originalCurve = () => {
+        const { from, c1, c2, to } = segmentsOf(contour())[head ? 1 : 0]
+        return [from.p, c1, c2, to.p]
+      }
+      const priorCurve = originalCurve()
+      // Releasing the snap modifier before pointer-up puts a small drag back on the grid.
+      select.pointerDown(ev(x, 6))
+      select.pointerMove(ev(x + 0.15, 6.15, { suspendSnap: true }))
+      expect(node()).toEqual({ ...saved, [side]: { x: x + 0.15, y: 6.15 } })
+      select.pointerUp(ev(x + 0.15, 6.15))
+      expect(node()).toEqual(saved)
+
+      const target = { x: x + 1.2, y: 7.3 }
+      const move = ev(target.x, target.y, { suspendSnap: true })
+      select.pointerDown(ev(x, 6))
+      select.pointerMove(move)
+      select.pointerUp(move)
+      expect(node()).toEqual({ ...saved, [side]: target })
+      expect(originalCurve()).toEqual(priorCurve)
+      expect(overlay()).toContainEqual({ kind: 'handle', from: endpoint.p, to: target })
     },
   )
 
@@ -684,4 +735,91 @@ describe('Pen drawing contexts', () => {
     expect(tool.overlay()).toContainEqual({ kind: 'anchor', p: { x: 7, y: 8 } })
     expect(tool.overlay().some((p) => p.kind === 'draft' || p.kind === 'handle')).toBe(false)
   })
+})
+
+describe('saved continuation handles', () => {
+  it.each([0, 1])('saves only the future handle at end %i and follows history', (index) => {
+    const { store, tool, a, b } = seeded()
+    const original = a.subpaths[0]
+    const node = original.nodes[index]
+    const side = index === 0 ? 'hIn' : 'hOut'
+    const snapped = { x: node.p.x, y: 7 }
+    const pull = ev(node.p.x, 6.8, {
+      snap: () => ({ point: snapped, targets: { x: null, y: null } }),
+    })
+    const down = () => tool.pointerDown(ev(node.p.x, node.p.y))
+    const contour = () => store.getState().doc.shapes[0].subpaths[0]
+    const history = () => store.getState().history.past.length
+    const preview = () => tool.overlay().find((p) => p.kind === 'draft')
+    const checkPreview = () => {
+      tool.hover?.(ev(node.p.x, 11))
+      expect(preview()?.shape.subpaths[0].nodes[0].hOut).toEqual(snapped)
+    }
+
+    down()
+    tool.pointerMove(pull)
+    expect(tool.overlay()).toContainEqual({ kind: 'handle', from: node.p, to: snapped })
+    expect(contour()).toBe(original)
+    tool.pointerUp(pull)
+    const saved = contour()
+    expect(history()).toBe(1)
+    expect(saved.nodes[index]).toEqual({ ...node, mode: 'corner', [side]: snapped })
+    expect(saved.nodes[1 - index]).toBe(original.nodes[1 - index])
+    const controls = (sp: typeof original) => segmentsOf(sp).map(({ c1, c2 }) => [c1, c2])
+    expect(controls(saved)).toEqual(controls(original))
+    expect(store.getState().doc.shapes[0].subpaths.slice(1)).toEqual(a.subpaths.slice(1))
+    expect(store.getState().doc.shapes[1]).toBe(b)
+    checkPreview()
+    tool.keyDown('Escape')
+    expect(history()).toBe(1)
+    store.undo()
+    expect(contour()).toBe(original)
+    store.redo()
+    expect(contour()).toBe(saved)
+    click(tool, node.p.x, node.p.y)
+    checkPreview()
+    click(tool, node.p.x, 11)
+    const extended = contour()
+    expect(history()).toBe(2)
+    expect(controls(extended)[index === 0 ? 0 : 1][index === 0 ? 1 : 0]).toEqual(snapped)
+    store.undo()
+    checkPreview()
+    store.undo()
+    tool.hover?.(ev(node.p.x, 11))
+    expect(preview()?.shape.subpaths[0].nodes[0].hOut).toBeUndefined()
+    store.redo()
+    checkPreview()
+    store.redo()
+    expect(contour()).toBe(extended)
+    tool.keyDown('Escape')
+    store.undo()
+    down()
+    tool.pointerUp(pull)
+    expect(history()).toBe(1)
+    expect(store.getState().history.future).toHaveLength(1)
+  })
+
+  it.each(['cancel', 'finish', 'invalidate', 'below threshold'])(
+    'does not save on %s',
+    (action) => {
+      const { store, tool, doc } = seeded()
+      tool.pointerDown(ev(2, 2))
+      const end = action === 'below threshold' ? ev(2.01, 2) : ev(2, 7)
+      tool.pointerMove(end)
+      if (action === 'cancel') tool.pointerCancel?.()
+      if (action === 'finish') tool.keyDown('Escape')
+      if (action === 'invalidate') {
+        store.dispatch({
+          label: 'External geometry',
+          recipe: (draft) => {
+            draft.shapes[0].subpaths[0].nodes[0].p.x = 3
+          },
+        })
+      }
+      const before = store.getState()
+      tool.pointerUp(end)
+      expect(store.getState().doc).toBe(action === 'invalidate' ? before.doc : doc)
+      expect(store.getState().history).toBe(before.history)
+    },
+  )
 })
