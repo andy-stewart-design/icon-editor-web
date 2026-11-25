@@ -799,13 +799,65 @@ describe('saved continuation handles', () => {
     expect(store.getState().history.future).toHaveLength(1)
   })
 
-  it.each(['cancel', 'finish', 'invalidate', 'below threshold'])(
+  it.each([0, 1])('cycles and previews both handles at end %i before a single commit', (index) => {
+    const { store, tool, a, b, doc } = seeded()
+    const original = a.subpaths[0]
+    const { p } = original.nodes[index]
+    const side = index === 0 ? 'hIn' : 'hOut'
+    const opposite = index === 0 ? 'hOut' : 'hIn'
+    const preview = () => tool.overlay().find((item) => item.kind === 'contourPreview')
+    const live = () => preview()?.next.nodes[index]
+    const contour = () => store.getState().doc.shapes[0].subpaths[0]
+    tool.pointerDown(ev(p.x, p.y))
+    expect(tool.cycleHandleMode?.()).toBe(false)
+    tool.pointerMove(ev(p.x, p.y + 3))
+    expect(preview()).toBeUndefined()
+    expect(tool.cycleHandleMode?.()).toBe(true)
+    expect(live()).toMatchObject({ mode: 'symmetric', [opposite]: { x: p.x, y: p.y - 3 } })
+    tool.pointerMove(ev(p.x, p.y + 5))
+    expect(tool.cycleHandleMode?.()).toBe(true)
+    tool.pointerMove(ev(p.x + 7, p.y))
+    expect(live()).toMatchObject({ mode: 'smooth', [opposite]: { x: p.x - 5, y: p.y } })
+    expect(tool.cycleHandleMode?.()).toBe(true)
+    const release = ev(p.x, p.y + 7)
+    tool.pointerMove(release)
+    expect(live()).toMatchObject({
+      mode: 'corner',
+      [opposite]: { x: p.x - 5, y: p.y },
+      [side]: release.pt,
+    })
+    const next = preview()?.next
+    expect(preview()?.previous).toBe(original)
+    expect(store.getState().doc).toBe(doc)
+    expect(store.getState().history.past).toHaveLength(0)
+    tool.pointerUp(release)
+    expect(preview()).toBeUndefined()
+    expect(contour()).toEqual(next)
+    expect(contour().nodes[1 - index]).toBe(original.nodes[1 - index])
+    expect(store.getState().doc.shapes[0].subpaths[1]).toBe(a.subpaths[1])
+    expect(store.getState().doc.shapes[0].style).toBe(a.style)
+    expect(store.getState().doc.shapes[1]).toBe(b)
+    expect(store.getState().history.past).toHaveLength(1)
+    expect(
+      tool.overlay().find((item) => item.kind === 'draft')?.shape.subpaths[0].nodes[0].hOut,
+    ).toEqual(release.pt)
+    click(tool, release.pt.x, release.pt.y)
+    expect(contour().nodes).toHaveLength(3)
+    store.undo()
+    expect(contour()).toEqual(next)
+    store.undo()
+    expect(store.getState().doc).toEqual(doc)
+  })
+
+  it.each(['cancel', 'finish', 'invalidate', 'history', 'below threshold'])(
     'does not save on %s',
     (action) => {
       const { store, tool, doc } = seeded()
       tool.pointerDown(ev(2, 2))
       const end = action === 'below threshold' ? ev(2.01, 2) : ev(2, 7)
       tool.pointerMove(end)
+      expect(tool.cycleHandleMode?.()).toBe(action !== 'below threshold')
+      if (action === 'history') store.undo()
       if (action === 'cancel') tool.pointerCancel?.()
       if (action === 'finish') tool.keyDown('Escape')
       if (action === 'invalidate') {
@@ -822,4 +874,59 @@ describe('saved continuation handles', () => {
       expect(store.getState().history).toBe(before.history)
     },
   )
+})
+
+describe('new Pen point handle modes', () => {
+  const draftNode = (tool: Tool) =>
+    tool.overlay().find((p) => p.kind === 'draft')?.shape.subpaths[0].nodes[1]
+
+  it('cycles only above threshold, using snapped geometry without writing history until release', () => {
+    const { tool, store } = setup()
+    tool.pointerDown(ev(4, 4))
+    tool.pointerMove(ev(4.1, 4))
+    expect(tool.cycleHandleMode?.()).toBe(false)
+    tool.pointerUp(ev(4.1, 4))
+    tool.pointerDown(ev(12, 4))
+    tool.pointerMove(ev(16, 5, { snap: () => noSnap({ x: 16, y: 4 }) }))
+    expect(draftNode(tool)).toMatchObject({ hIn: { x: 8, y: 4 }, hOut: { x: 16, y: 4 } })
+    expect(tool.cycleHandleMode?.()).toBe(true)
+    tool.pointerMove(ev(12, 12))
+    expect(draftNode(tool)).toMatchObject({ hIn: { x: 12, y: 0 }, hOut: { x: 12, y: 12 } })
+    tool.cycleHandleMode?.()
+    tool.pointerMove(ev(14, 4))
+    expect(draftNode(tool)).toMatchObject({ hIn: { x: 12, y: 0 }, hOut: { x: 14, y: 4 } })
+    tool.cycleHandleMode?.()
+    const draft = draftNode(tool)
+    expect(draft).toMatchObject({ hIn: { x: 10, y: 4 }, hOut: { x: 14, y: 4 } })
+    expect(store.getState().history.past).toHaveLength(0)
+    tool.pointerUp(ev(14, 4))
+    const { doc, history } = store.getState()
+    expect(history.past).toHaveLength(1)
+    const [first, second] = doc.shapes[0].subpaths[0].nodes
+    expect(first.mode).toBe('corner')
+    expect(first.hOut).toBeUndefined()
+    expect(second).toEqual(draft)
+    expect(tool.cycleHandleMode?.()).toBe(false)
+  })
+
+  it('swaps Free handles when committing head-first', () => {
+    const { store, tool } = seeded()
+    tool.pointerDown(ev(2, 2))
+    tool.pointerUp(ev(2, 2))
+    tool.pointerDown(ev(7, 8))
+    tool.pointerMove(ev(9, 8))
+    tool.cycleHandleMode?.()
+    tool.cycleHandleMode?.()
+    tool.pointerMove(ev(7, 12))
+    const draft = draftNode(tool)
+    expect(draft).toMatchObject({ mode: 'corner', hIn: { x: 5, y: 8 }, hOut: { x: 7, y: 12 } })
+    expect(store.getState().history.past).toHaveLength(0)
+    tool.pointerUp(ev(7, 12))
+    expect(store.getState().doc.shapes[0].subpaths[0].nodes[0]).toEqual({
+      ...draft,
+      hIn: draft?.hOut,
+      hOut: draft?.hIn,
+    })
+    expect(store.getState().history.past).toHaveLength(1)
+  })
 })

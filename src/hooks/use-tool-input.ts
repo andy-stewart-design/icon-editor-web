@@ -345,6 +345,23 @@ export function useToolInput(): ToolInput {
         const tool = toolRef.current
         if (!tool) return
         const { ui } = store.getState()
+        if (
+          e.key.toLowerCase() === 'm' &&
+          gestureRef.current &&
+          !e.repeat &&
+          !e.metaKey &&
+          !e.ctrlKey &&
+          !e.altKey &&
+          !e.shiftKey &&
+          !spaceRef.current &&
+          !gestureRef.current.el.dataset.pan &&
+          !isEditable(e.target) &&
+          tool.cycleHandleMode?.()
+        ) {
+          e.preventDefault()
+          bump()
+          return
+        }
         if (e.key === 'Escape' || e.key === 'Enter') {
           if (isEditable(e.target)) return
           // Select Enter belongs exclusively to the app shortcut table. In Pen, suppress

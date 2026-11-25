@@ -1,6 +1,6 @@
 import type { Command } from '../commands'
 import type { Rect } from '../geometry/bounds'
-import type { PathShape, Pt } from '../model'
+import type { PathShape, Pt, Subpath } from '../model'
 import type { SnapResult } from '../snap'
 
 // Built by the host for each pointer event (see buildSnapFn). It already honors suspendSnap.
@@ -18,6 +18,7 @@ export type ToolEvent = {
 
 // Plain data in document space. The UI layer decides how to draw each primitive.
 export type OverlayPrimitive =
+  | { kind: 'contourPreview'; shapeId: string; previous: Subpath; next: Subpath }
   | { kind: 'draft'; shape: PathShape }
   | { kind: 'snapPoint'; p: Pt } // an anchor target was hit
   | { kind: 'snapLine'; axis: 'x' | 'y'; value: number } // a straight target (edge, center or guide) was hit
@@ -49,6 +50,7 @@ export interface Tool {
   doubleClick?(e: ToolEvent): void
   // 'Escape' cancels the draft without committing, except the Pen tool, which finishes its path. 'Enter' is sent to every tool.
   keyDown(key: string): void
+  cycleHandleMode?(): boolean
   overlay(): OverlayPrimitive[]
   // Plain pointer moves with no button held. The host calls it only when the method exists (Select and Pen use it).
   hover?(e: ToolEvent): void

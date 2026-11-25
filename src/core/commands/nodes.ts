@@ -113,10 +113,15 @@ export function moveNodesRecipe(refs: readonly NodeRef[], dx: number, dy: number
 }
 
 // Moves one handle of a node to pt. The node's mode is applied to the opposite handle (see moveHandle).
-export function setNodeHandleRecipe(ref: NodeRef, which: 'in' | 'out', pt: Pt): Recipe {
+export function setNodeHandleRecipe(
+  ref: NodeRef,
+  which: 'in' | 'out',
+  pt: Pt,
+  modeBasis?: PathNode,
+): Recipe {
   return editSubpaths([ref], (sp, ids) => ({
     ...sp,
-    nodes: sp.nodes.map((n) => (ids.has(n.id) ? moveHandle(n, which, pt) : n)),
+    nodes: sp.nodes.map((n) => (ids.has(n.id) ? moveHandle(modeBasis ?? n, which, pt) : n)),
   }))
 }
 

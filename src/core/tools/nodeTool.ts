@@ -4,7 +4,7 @@ import type { Rect } from '../geometry/bounds'
 import { nearestSegment } from '../geometry/nodes'
 import { segmentBetween, segmentsOf } from '../geometry/segments'
 import { resolveSegment, type NodeRef, type SegmentRef, type Selection } from '../history'
-import type { IconDoc, PathShape, Pt } from '../model'
+import type { IconDoc, PathNode, PathShape, Pt } from '../model'
 import type { EditorState } from '../store'
 import { snapIndicator } from './dragTool'
 import { DRAG_THRESHOLD_PX, HIT_TOLERANCE_PX, hitTestShape } from './selectTool'
@@ -210,6 +210,7 @@ type Gesture =
       which: 'in' | 'out'
       start: Pt
       dragged: boolean
+      modeBasis?: PathNode
       indicator: OverlayPrimitive[]
       before: Selection
     }
@@ -288,7 +289,7 @@ export function createNodeTool(host: NodeHost): NodeTool {
       new Set([g.ref.shapeId]),
     )
     const s = snap(e.pt)
-    host.update(setNodeHandleRecipe(g.ref, g.which, s.point))
+    host.update(setNodeHandleRecipe(g.ref, g.which, s.point, g.modeBasis))
     g.indicator = snapIndicator(s.targets)
   }
 
@@ -464,6 +465,24 @@ export function createNodeTool(host: NodeHost): NodeTool {
       else if (!g.shift && g.wasSelected && selection.nodes.length > 1)
         after = { shapeIds: selection.shapeIds, nodes: [g.pressed] }
       host.commit(after)
+    },
+
+    cycleHandleMode() {
+      const g = gesture
+      if (g?.kind !== 'handle' || !g.dragged) return false
+      const { doc } = host.getState()
+      const node = doc.shapes
+        .find((s) => s.id === g.ref.shapeId)
+        ?.subpaths.find((sp) => sp.id === g.ref.subpathId)
+        ?.nodes.find((n) => n.id === g.ref.nodeId)
+      const pt = g.which === 'in' ? node?.hIn : node?.hOut
+      if (!node || !pt) return false
+      const mode =
+        node.mode === 'symmetric' ? 'smooth' : node.mode === 'smooth' ? 'corner' : 'symmetric'
+      // Updates run from the press-time doc. Seed the new mode with the live opposite handle at this switch.
+      g.modeBasis = { ...node, mode }
+      host.update(setNodeHandleRecipe(g.ref, g.which, pt, g.modeBasis))
+      return true
     },
 
     pointerCancel() {

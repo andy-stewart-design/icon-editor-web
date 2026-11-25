@@ -1,13 +1,12 @@
 import { useLayoutEffect, useRef } from 'react'
-import { docToScreen, rootAttributes, serializeBody } from '../../../core'
+import { docToScreen, rootAttributes, serializeBody, type IconDoc } from '../../../core'
 import { useEditor } from '../../../hooks/use-editor'
 import s from './styles.module.css'
 
 // These come from the layer's own geometry (viewBox, size) rather than the serializer's root attributes.
 const OWN_ATTRIBUTES = new Set(['xmlns', 'width', 'height', 'viewBox'])
 
-export default function ContentLayer() {
-  const doc = useEditor((e) => e.doc)
+export default function ContentLayer({ doc }: { doc: IconDoc }) {
   const vp = useEditor((e) => e.ui.viewport)
   const ref = useRef<SVGSVGElement>(null)
 

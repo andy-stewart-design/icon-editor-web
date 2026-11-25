@@ -1,4 +1,5 @@
 import { drawContour, insertNode } from '../commands/nodes'
+import { moveHandle } from '../geometry/nodes'
 import { newId } from '../ids'
 import type { PathNode, PathShape, Pt, Subpath } from '../model'
 import { toolContext, type EditorStore } from '../store'
@@ -18,7 +19,7 @@ type Destination = { shape: PathShape; endpoint: Endpoint | null }
 type Targets = SnapResult['targets']
 
 // A pending first press carries its destination until release. Resuming pulls only the continuation
-// handle; closing a resumed contour does not modify either endpoint.
+// handle unless the user cycles its mode; closing a resumed contour does not modify either endpoint.
 type Press = {
   start?: Destination
   node: PathNode
@@ -26,6 +27,8 @@ type Press = {
   origin: Pt
   dragged: boolean
   handle: Pt | null
+  smoothLength?: number
+  continuationBasis?: PathNode
 }
 
 // The node with its outgoing handle at `handle` and the incoming handle mirrored through the anchor. Null leaves it as is.
@@ -177,6 +180,13 @@ export function createPenTool(
     hoverNearClose = nearClose(e.pt, e.zoom)
   }
 
+  const continuationContour = (endpoint: Endpoint, node: PathNode) => {
+    const { subpath, end } = endpoint
+    const nodes = subpath.nodes.slice()
+    nodes[end === 'head' ? 0 : nodes.length - 1] = node
+    return { ...subpath, nodes }
+  }
+
   const move = (e: ToolEvent): void => {
     if (insertion) {
       insertion.dragged ||=
@@ -195,6 +205,25 @@ export function createPenTool(
     const s = e.snap(e.pt)
     p.handle = s.point
     targets = s.targets
+    const endpoint = p.start?.endpoint
+    if (endpoint) {
+      p.node = p.continuationBasis
+        ? moveHandle(p.continuationBasis, endpoint.end === 'head' ? 'in' : 'out', s.point)
+        : withContinuationHandle(endpoint.node, endpoint.end, s.point)
+    } else if (!p.closing) {
+      const { node } = p
+      if (node.hOut?.x === s.point.x && node.hOut.y === s.point.y) return
+      if (!node.hOut || node.mode === 'symmetric') p.node = withHandle(node, s.point)
+      else if (node.mode === 'smooth') {
+        const dx = s.point.x - node.p.x
+        const dy = s.point.y - node.p.y
+        const length = Math.hypot(dx, dy)
+        // A snapped pointer on the anchor has no direction: keep the last opposite handle.
+        const ratio = (p.smoothLength ?? 0) / length
+        const hIn = length ? { x: node.p.x - dx * ratio, y: node.p.y - dy * ratio } : node.hIn
+        p.node = { ...node, hOut: s.point, hIn }
+      } else p.node = { ...node, hOut: s.point }
+    }
   }
 
   return {
@@ -277,12 +306,8 @@ export function createPenTool(
       press = null
       if (p.start) destination = p.start
       if (p.start?.endpoint) {
-        const { node, end, subpath } = p.start.endpoint
-        const next = p.handle ? withContinuationHandle(node, end, p.handle) : node
-        if (next !== node) {
-          const nodes = subpath.nodes.slice()
-          nodes[end === 'head' ? 0 : nodes.length - 1] = next
-          commit({ ...subpath, nodes }, e, undefined, 'continuation')
+        if (p.node !== p.start.endpoint.node) {
+          commit(continuationContour(p.start.endpoint, p.node), e, undefined, 'continuation')
           return
         }
         track(e)
@@ -305,7 +330,7 @@ export function createPenTool(
         track(e)
         return
       }
-      const node = withHandle(p.node, p.handle)
+      const node = p.node
       if (endpoint) commit(extendPenContour(endpoint.subpath, endpoint.end, [node], false), e)
       else if (provisional) {
         const path = committedPath([provisional, node], false)
@@ -326,6 +351,30 @@ export function createPenTool(
 
     keyDown(key) {
       if (key === 'Enter' || key === 'Escape') finish()
+    },
+
+    cycleHandleMode() {
+      if (!press?.dragged || press.closing || !validate()) return false
+      const { node, handle } = press
+      const endpoint = press.start?.endpoint
+      if (endpoint && handle) {
+        const mode =
+          node.mode === 'symmetric' ? 'smooth' : node.mode === 'smooth' ? 'corner' : 'symmetric'
+        // Smooth and Free take their opposite handle from the live geometry at the switch.
+        press.continuationBasis = { ...node, mode }
+        press.node = moveHandle(
+          press.continuationBasis,
+          endpoint.end === 'head' ? 'in' : 'out',
+          handle,
+        )
+        return true
+      }
+      if (node.mode === 'symmetric' && node.hIn) {
+        press.smoothLength = Math.hypot(node.hIn.x - node.p.x, node.hIn.y - node.p.y)
+        press.node = { ...node, mode: 'smooth' }
+      } else if (node.mode === 'smooth') press.node = { ...node, mode: 'corner' }
+      else press.node = withHandle(node, press.handle)
+      return true
     },
 
     // Called by the host on plain moves, when no press is active.
@@ -387,8 +436,7 @@ export function createPenTool(
       const endpoint = destination?.endpoint ?? press?.start?.endpoint
       const closing = press?.closing === true
       const close = closeAnchor()
-      const pending =
-        press && !closing && !press.start?.endpoint ? withHandle(press.node, press.handle) : null
+      const pending = press && !closing && !press.start?.endpoint ? press.node : null
       const first = closing && fresh && close ? withHandle(close, press?.handle ?? null) : null
       // Preview in drawing order, with just the new segments and their attachment anchors.
       const inDrawingOrder = (n: PathNode): PathNode =>
@@ -451,8 +499,24 @@ export function createPenTool(
         pending && press?.dragged ? pending : null,
         first,
       ]
-      if (press?.start?.endpoint && press.handle)
+      const resumeStart = press?.start
+      const resumePress = resumeStart?.endpoint
+      if (resumePress && press?.handle) {
         out.push({ kind: 'handle', from: press.node.p, to: press.handle })
+        if (press.continuationBasis) {
+          const side = resumePress.end === 'head' ? 'hOut' : 'hIn'
+          const opposite = press.node[side]
+          if (opposite) out.push({ kind: 'handle', from: press.node.p, to: opposite })
+          if (opposite !== resumePress.node[side] && resumePress.subpath.nodes.length > 1) {
+            out.push({
+              kind: 'contourPreview',
+              shapeId: resumeStart.shape.id,
+              previous: resumePress.subpath,
+              next: continuationContour(resumePress, press.node),
+            })
+          }
+        }
+      }
       for (const n of handleNodes) {
         if (!n) continue
         if (n.hIn) out.push({ kind: 'handle', from: n.p, to: n.hIn })
