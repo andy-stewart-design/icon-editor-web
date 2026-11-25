@@ -60,5 +60,5 @@ export interface Tool {
   // commit do it here. Other tools leave it out.
   deactivate?(): void
   beforeHistory?(direction: 'undo' | 'redo'): boolean
-  afterHistory?(applied: boolean): void
+  afterHistory?(applied: boolean, direction: 'undo' | 'redo'): void
 }

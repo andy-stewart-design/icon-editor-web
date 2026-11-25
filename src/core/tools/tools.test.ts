@@ -3,6 +3,7 @@ import { createDefaultDoc, type PathShape } from '../model'
 import { createEditorStore, isNodeSelect, toolContext } from '../store'
 import { createEllipseTool } from './ellipseTool'
 import { createLineTool } from './lineTool'
+import { createPenTool } from './penTool'
 import { createRectTool } from './rectTool'
 import type { SnapFn, Tool, ToolEvent, ToolHost } from './types'
 
@@ -166,28 +167,55 @@ describe('line tool (R9, AC13)', () => {
 })
 
 describe('editor tool contexts', () => {
-  it('keeps Select and Pen independent of editing mode', () => {
-    const store = createEditorStore(createDefaultDoc())
+  it.each(['Pen from Node Select', 'Node mode from Shape Pen'])(
+    'activating %s without a selection leaves Shape Pen ready to draw',
+    (entry) => {
+      const store = createEditorStore(createDefaultDoc())
+      if (entry === 'Pen from Node Select') {
+        store.setUi({ mode: 'node' })
+        expect(isNodeSelect(store.getState().ui)).toBe(true)
+        store.setUi({ activeTool: 'pen' })
+      } else {
+        store.setUi({ activeTool: 'pen' })
+        store.setUi({ mode: 'node' })
+      }
+      const context = toolContext(store.getState().ui)
+      expect(context).toBe('shape-pen')
+      const tool = createPenTool(store, { mode: context === 'node-pen' ? 'node' : 'shape' })
+      tool.pointerDown(ev(4, 4))
+      tool.pointerUp(ev(4, 4))
+      tool.pointerDown(ev(12, 4))
+      tool.pointerUp(ev(12, 4))
+      tool.keyDown('Enter')
+      expect(store.getState().doc.shapes).toHaveLength(1)
+    },
+  )
+
+  it('enters Node Pen with a selected shape and stays there on selection loss and UI updates', () => {
+    const { store, tool } = setup((host) => createLineTool(host))
+    tool.pointerDown(ev(4, 4))
+    tool.pointerUp(ev(12, 4))
+    const [shape] = store.getState().doc.shapes
+    store.setSelection({ shapeIds: [shape.id], nodes: [] })
     const route = () => toolContext(store.getState().ui)
-    expect(route()).toBe('shape-select')
-    store.setUi({ mode: 'node', activeTool: 'select' })
-    expect(route()).toBe('node-select')
-    expect(isNodeSelect(store.getState().ui)).toBe(true)
+    store.setUi({ mode: 'node' })
     store.setUi({ activeTool: 'pen' })
     expect(route()).toBe('node-pen')
-    expect(isNodeSelect(store.getState().ui)).toBe(false)
     store.setUi({ mode: 'shape' })
     expect(route()).toBe('shape-pen')
     store.setUi({ mode: 'node' })
-    store.setUi({ activeTool: 'select' })
-    expect(route()).toBe('node-select')
+    expect(route()).toBe('node-pen')
+    store.setSelection({ shapeIds: [], nodes: [] })
+    expect(route()).toBe('node-pen')
+    store.setUi({ snapEnabled: !store.getState().ui.snapEnabled })
+    expect(route()).toBe('node-pen')
   })
 
   it.each(['line', 'rect', 'ellipse'] as const)(
     'choosing %s enters Shape atomically',
     (activeTool) => {
       const store = createEditorStore(createDefaultDoc())
-      store.setUi({ mode: 'node', activeTool: 'pen' })
+      store.setUi({ mode: 'node' })
       const seen: string[] = []
       const unsubscribe = store.subscribe(() => {
         const { ui } = store.getState()

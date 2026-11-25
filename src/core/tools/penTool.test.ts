@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { segmentsOf } from '../geometry/segments'
 import { serializeBody } from '../serialize'
 import { createDefaultDoc, type PathShape } from '../model'
-import { createEditorStore } from '../store'
+import { createEditorStore, toolContext } from '../store'
 import { createPenTool } from './penTool'
 import type { SnapFn, Tool, ToolEvent } from './types'
 
@@ -22,7 +22,7 @@ const ev = (x: number, y: number, o: Partial<ToolEvent> = {}): ToolEvent => ({
 function bind(store: ReturnType<typeof createEditorStore>, tool: Tool) {
   store.bindHistoryInput({
     before: (direction) => tool.beforeHistory?.(direction) ?? false,
-    after: (applied) => tool.afterHistory?.(applied),
+    after: (applied, direction) => tool.afterHistory?.(applied, direction),
   })
 }
 
@@ -178,6 +178,7 @@ function seeded(mode: 'node' | 'shape' = 'node') {
   const store = createEditorStore(doc)
   const select = (...shapeIds: string[]) => store.setSelection({ shapeIds, nodes: [] })
   select(a.id)
+  store.setUi({ mode, activeTool: 'pen' })
   const tool = mode === 'shape' ? createPenTool(store) : createPenTool(store, { mode })
   bind(store, tool)
   return { store, tool, doc, a, b, select }
@@ -395,6 +396,7 @@ describe('Pen drawing contexts', () => {
     tool.pointerDown(ev(9, 9))
     store.undo()
     tool.pointerUp(ev(9, 9))
+    expect(toolContext(store.getState().ui)).toBe(`${mode}-pen`)
     expect(store.getState()).toBe(before)
     expect(tool.overlay().some((p) => p.kind === 'anchor')).toBe(false)
     expect(committed).toHaveLength(0)
@@ -430,6 +432,79 @@ describe('Pen drawing contexts', () => {
       expect(tool.overlay().some((p) => p.kind === 'anchor')).toBe(false)
     },
   )
+
+  it.each([false, true])(
+    'switches to Shape Pen when Undo removes the only owner (attached: %s)',
+    (attached) => {
+      const { a } = seeded()
+      const store = createEditorStore(createDefaultDoc())
+      store.updateDoc('Add owner', (d) => {
+        d.shapes.push(a)
+      })
+      store.setSelection({ shapeIds: [a.id], nodes: [] })
+      store.setUi({ mode: 'node', activeTool: 'pen' })
+      const tool = createPenTool(store, { mode: 'node' })
+      bind(store, tool)
+      if (attached) click(tool, 12, 2)
+      tool.pointerDown(ev(7, 8))
+      store.undo()
+      const after = store.getState()
+      expect(after.selection.shapeIds).toEqual([])
+      expect(toolContext(after.ui)).toBe('shape-pen')
+      tool.pointerUp(ev(7, 8))
+      expect(store.getState()).toBe(after)
+    },
+  )
+
+  it.each(['attached', 'selected'] as const)(
+    'stays in Node Pen after Undo with an %s owner',
+    (owner) => {
+      const { store, tool, select } = seeded()
+      if (owner === 'attached') {
+        click(tool, 12, 2)
+        select()
+      }
+      store.updateDoc('Restyle another shape', (d) => {
+        d.shapes[1].style.strokeWidth = 3
+      })
+      store.undo()
+      expect(toolContext(store.getState().ui)).toBe('node-pen')
+      if (owner === 'attached') {
+        expect(store.getState().selection.shapeIds).toEqual([])
+        expect(tool.overlay()).toContainEqual({ kind: 'anchor', p: { x: 12, y: 2 } })
+      } else expect(store.getState().selection.shapeIds).toEqual(['a'])
+    },
+  )
+
+  it('consumes a provisional Undo without leaving Node Pen even after selection loss', () => {
+    const { store, tool, select } = seeded()
+    store.updateDoc('Restyle', (d) => {
+      d.shapes[1].style.strokeWidth = 3
+    })
+    click(tool, 4, 9)
+    expect(tool.overlay()).toContainEqual({ kind: 'anchor', p: { x: 4, y: 9 } })
+    select()
+    const before = store.getState()
+    store.undo()
+    expect(store.getState()).toBe(before)
+    expect(toolContext(before.ui)).toBe('node-pen')
+    expect(tool.overlay()).toEqual([])
+  })
+
+  it('does not switch on selection loss, unavailable Undo, or applied Redo without a selection', () => {
+    const { store, select } = seeded()
+    select()
+    store.undo()
+    expect(toolContext(store.getState().ui)).toBe('node-pen')
+    select('a')
+    store.updateDoc('Remove all shapes', (d) => {
+      d.shapes = []
+    })
+    store.undo()
+    store.redo()
+    expect(store.getState().selection.shapeIds).toEqual([])
+    expect(toolContext(store.getState().ui)).toBe('node-pen')
+  })
 
   it.each([2, 12])('follows point Undo and Redo at endpoint x=%s', (x) => {
     const { store, tool, a } = seeded()

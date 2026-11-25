@@ -67,11 +67,19 @@ export const isNodeSelect = (ui: Pick<UiState, 'mode' | 'activeTool'>): boolean 
 export const toolContext = ({ mode, activeTool }: Pick<UiState, 'mode' | 'activeTool'>) =>
   activeTool === 'select' || activeTool === 'pen' ? (`${mode}-${activeTool}` as const) : activeTool
 
-function updateUi(ui: UiState, patch: Partial<UiState>): UiState {
+function updateUi(ui: UiState, patch: Partial<UiState>, selection: Selection): UiState {
   const next = { ...ui, ...patch }
   if (next.activeTool !== 'select' && next.activeTool !== 'pen') {
     if (patch.activeTool !== undefined) next.mode = 'shape'
     else if (next.mode === 'node') next.activeTool = 'select'
+  }
+  // Only redirect on entry; selection loss must not retire an active Node Pen.
+  if (
+    selection.shapeIds.length === 0 &&
+    toolContext(next) === 'node-pen' &&
+    toolContext(ui) !== 'node-pen'
+  ) {
+    next.mode = 'shape'
   }
   return next
 }
@@ -81,7 +89,7 @@ export type Listener = (doc: IconDoc) => void
 // Deliberately omits setState: documents change only through the command API below.
 type HistoryInput = {
   before: (direction: 'undo' | 'redo') => boolean
-  after: (applied: boolean) => void
+  after: (applied: boolean, direction: 'undo' | 'redo') => void
 }
 
 export type EditorStore = {
@@ -127,7 +135,7 @@ export function createEditorStore(initialDoc: IconDoc): EditorStore {
       applied = !input?.before(direction) && commands[direction]()
     } finally {
       try {
-        if (historyInput === input) input?.after(applied)
+        if (historyInput === input) input?.after(applied, direction)
       } finally {
         navigating = false
       }
@@ -143,7 +151,7 @@ export function createEditorStore(initialDoc: IconDoc): EditorStore {
     },
     setUi: (patch) => {
       const { ui, selection } = api.getState()
-      const next = updateUi(ui, patch)
+      const next = updateUi(ui, patch, selection)
       api.setState({
         ui: next,
         selection: isNodeSelect(next) ? selection : withoutSegment(selection),

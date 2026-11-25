@@ -151,11 +151,12 @@ export function useToolInput(): ToolInput {
         releaseGesture(gestureRef)
         return current.beforeHistory(direction)
       },
-      after(applied) {
+      after(applied, direction) {
         const current = historyTool
         historyTool = null
         if (!current || current !== toolRef.current) return
-        current.afterHistory?.(applied)
+        current.afterHistory?.(applied, direction)
+        if (current !== toolRef.current) return
         const hover = hoverRef.current
         if (hover) current.hover?.(toolEvent(store, hover.local, hover.mods, spaceRef.current))
         bump()

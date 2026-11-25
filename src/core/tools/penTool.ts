@@ -1,7 +1,7 @@
 import { drawContour } from '../commands/nodes'
 import { newId } from '../ids'
 import type { PathNode, PathShape, Pt, Subpath } from '../model'
-import type { EditorStore } from '../store'
+import { toolContext, type EditorStore } from '../store'
 import type { SnapResult } from '../snap'
 import { addShapeCommand, snapIndicator } from './dragTool'
 import { extendPenContour, resolvePenEndpoint } from './penTarget'
@@ -48,7 +48,7 @@ function previewPath(nodes: PathNode[]): PathShape {
 // Shape Pen creates; Node Pen appends or extends against a fixed destination. Both share the
 // snapped click/drag gestures; only releases write geometry.
 export function createPenTool(
-  host: ToolHost & Pick<EditorStore, 'getState'>,
+  host: ToolHost & Pick<EditorStore, 'getState' | 'setUi'>,
   context: PenContext = { mode: 'shape' },
 ): Tool {
   let destination: Destination | undefined
@@ -291,12 +291,19 @@ export function createPenTool(
       return false
     },
 
-    afterHistory(applied) {
+    afterHistory(applied, direction) {
       transitioning = false
       if (!applied) return
       const pinned = destination
       if (pinned?.endpoint) attach(pinned.shape.id, pinned.endpoint.subpath.id, pinned.endpoint.end)
       else finish()
+      // Reconcile the pinned contour first: an attachment can still draw without a selection.
+      if (direction === 'undo' && context.mode === 'node' && !destination?.endpoint) {
+        const { ui, selection } = host.getState()
+        if (toolContext(ui) === 'node-pen' && selection.shapeIds.length === 0) {
+          host.setUi({ mode: 'shape' })
+        }
+      }
     },
 
     overlay() {
