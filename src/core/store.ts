@@ -8,10 +8,11 @@ import {
   type HistoryState,
   type Selection,
 } from './history'
+import { captureClipboard, pasteClipboard, type Clipboard } from './commands/clipboard'
 import type { ResizeMode } from './commands/document'
 import type { IconDoc } from './model'
 import type { LoadResult, SaveStatus } from './persistence'
-import type { Size, Viewport } from './viewport'
+import { screenToDoc, type Size, type Viewport } from './viewport'
 
 export type ActiveTool = 'select' | 'pen' | 'line' | 'rect' | 'ellipse'
 export type EditMode = 'shape' | 'node'
@@ -107,6 +108,7 @@ export type EditorStore = {
   bindHistoryInput: (input: HistoryInput) => () => void
   undo: () => void
   redo: () => void
+  clipboard: (action: 'copy' | 'cut' | 'paste') => void
   canUndo: () => boolean
   canRedo: () => boolean
   subscribeCommitted: (listener: Listener) => () => void
@@ -141,6 +143,15 @@ export function createEditorStore(initialDoc: IconDoc): EditorStore {
       }
     }
   }
+  let clipboard: Clipboard | undefined
+  const setUi: EditorStore['setUi'] = (patch) => {
+    const { ui, selection } = api.getState()
+    const next = updateUi(ui, patch, selection)
+    api.setState({
+      ui: next,
+      selection: isNodeSelect(next) ? selection : withoutSegment(selection),
+    })
+  }
   return {
     getState: api.getState,
     subscribe: api.subscribe,
@@ -149,13 +160,30 @@ export function createEditorStore(initialDoc: IconDoc): EditorStore {
         selection: selection.segment ? selectionFor(selection, api.getState().doc) : selection,
       })
     },
-    setUi: (patch) => {
-      const { ui, selection } = api.getState()
-      const next = updateUi(ui, patch, selection)
-      api.setState({
-        ui: next,
-        selection: isNodeSelect(next) ? selection : withoutSegment(selection),
-      })
+    setUi,
+    clipboard: (action) => {
+      const { doc, selection, ui, tx } = api.getState()
+      if (tx) return
+      const nodeSelect = isNodeSelect(ui)
+      if (action === 'paste') {
+        if (!clipboard) return
+        const payload = clipboard
+        const { width, height } = ui.canvasSize
+        // Keep the original placement until the canvas has a visible area.
+        const center =
+          width > 0 && height > 0
+            ? screenToDoc(ui.viewport, { x: width / 2, y: height / 2 })
+            : undefined
+        const command = pasteClipboard(doc, selection, nodeSelect, payload, center)
+        if (!command) return
+        commands.dispatch(command)
+        if (payload.kind === 'points' && !nodeSelect) setUi({ activeTool: 'select', mode: 'node' })
+      } else {
+        const captured = captureClipboard(doc, selection, nodeSelect, action === 'cut')
+        if (!captured) return
+        clipboard = captured.payload
+        if (captured.command) commands.dispatch({ ...captured.command, label: 'Cut' })
+      }
     },
     ...commands,
     bindHistoryInput: (input) => {
