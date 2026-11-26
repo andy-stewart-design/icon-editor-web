@@ -98,6 +98,9 @@ export function pasteClipboard(
     const live = doc.shapes.filter((shape) => candidates.has(shape.id))
     if (live.length > 1) return
     owner = live[0]
+  } else if (!points && nodeSelect) {
+    const selected = doc.shapes.filter((shape) => sel.shapeIds.includes(shape.id))
+    if (selected.length === 1) owner = selected[0]
   }
   const ownerIndex = owner ? doc.shapes.indexOf(owner) : -1
 

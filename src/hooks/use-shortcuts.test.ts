@@ -3,10 +3,12 @@ import {
   createDefaultDoc,
   createEditorStore,
   screenToDoc,
+  serializeBody,
   selectionBounds,
   type PathShape,
 } from '../core'
 import { makeLine } from '../core/geometry/shapes'
+import { createSelectTool } from '../core/tools/selectTool'
 import { dispatchKey } from './use-shortcuts'
 
 class ElementStub extends EventTarget {
@@ -200,6 +202,63 @@ describe('local clipboard shortcuts', () => {
     store.undo()
     store.undo()
     expect(store.getState().selection).toEqual(after)
+  })
+
+  it('pastes a copied shape as separate contours in the target after switching to node mode', () => {
+    const source = path('source', [0, 4, 8], true)
+    source.subpaths.push({ ...path('extra', [0, 4]).subpaths[0] })
+    const target = { ...path('target', [24, 30]), style: { strokeWidth: 8 } }
+    const original = { ...createDefaultDoc(), shapes: [source, target] }
+    const { store, viewport, press } = setup(original)
+    const select = createSelectTool(store)
+    const click = (x: number) => {
+      const event = {
+        pt: { x, y: 5 },
+        zoom: viewport.zoom,
+        shift: false,
+        alt: false,
+        space: false,
+        suspendSnap: false,
+        snap: (point: { x: number; y: number }) => ({ point, targets: { x: null, y: null } }),
+      }
+      select.pointerDown(event)
+      select.pointerUp(event)
+    }
+
+    click(4)
+    expect(store.getState().selection.shapeIds).toEqual([source.id])
+    press('c', cmd)
+    click(27)
+    expect(press('Enter', {})).toBe(true)
+    const before = store.getState()
+    expect(before.ui.mode).toBe('node')
+    expect(before.selection).toEqual({ shapeIds: [target.id], nodes: [] })
+    press('v', cmd)
+
+    const { doc, history } = store.getState()
+    expect(doc.shapes.map((shape) => shape.id)).toEqual([source.id, target.id])
+    const pasted = doc.shapes[1]
+    expect(pasted.style).toEqual(target.style)
+    expect(pasted.subpaths[0]).toEqual(target.subpaths[0])
+    const appended = pasted.subpaths.slice(1)
+    expect(appended.map(({ closed, nodes }) => [closed, nodes.length])).toEqual([
+      [true, 3],
+      [false, 2],
+    ])
+    const ids = doc.shapes.flatMap((shape) =>
+      shape.subpaths.flatMap((sp) => [sp.id, ...sp.nodes.map((node) => node.id)]),
+    )
+    expect(new Set(ids).size).toBe(ids.length)
+    const bounds = selectionBounds([{ ...pasted, subpaths: appended }])!
+    expect(bounds.x + bounds.w / 2).toBeCloseTo(62.5)
+    expect(bounds.y + bounds.h / 2).toBeCloseTo(56.25)
+    const paths = [...serializeBody(doc).matchAll(/<path d="([^"]+)"/g)]
+    expect(paths).toHaveLength(2)
+    expect(paths[1][1].match(/M/g)).toHaveLength(3)
+    expect(history.past).toHaveLength(1)
+    store.undo()
+    expect(store.getState().doc).toBe(before.doc)
+    expect(store.getState().selection).toEqual(before.selection)
   })
 
   it('keeps the closed seam together, preserves whole contours, and never bridges gaps', () => {
@@ -423,8 +482,10 @@ describe('local clipboard shortcuts', () => {
     press('x', cmd)
     expect(store.canUndo()).toBe(false)
     press('v', cmd)
-    expect(store.getState().doc.shapes[2].subpaths[0].nodes.map((n) => n.p.x)).toEqual([62, 63])
-    expect(store.getState().selection.segment).toBeUndefined()
+    const { doc, selection } = store.getState()
+    expect(doc.shapes).toHaveLength(2)
+    expect(doc.shapes[0].subpaths[1].nodes.map((n) => n.p.x)).toEqual([62, 63])
+    expect(selection.segment).toBeUndefined()
   })
 
   it('ignores repeats and open gestures, leaves native fields alone, and isolates editors', () => {
