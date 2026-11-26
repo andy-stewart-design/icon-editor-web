@@ -6,6 +6,7 @@ import {
   type PathShape,
   type Subpath,
 } from '../model'
+import { legacyIconDoc, legacyIconSvg } from '../test-fixtures/legacy-icon-doc'
 import { serializeDoc } from '.'
 
 const corner = (id: string, x: number, y: number): PathNode => ({ id, p: { x, y }, mode: 'corner' })
@@ -22,6 +23,10 @@ const ROOT_OPEN =
   '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">'
 
 describe('serializeDoc', () => {
+  it('matches the full legacy SVG without cropping or reordering paths', () => {
+    expect(serializeDoc(legacyIconDoc)).toBe(legacyIconSvg)
+  })
+
   it('matches the spec example exactly', () => {
     const line = shape('s1', [sub('sp1', [corner('n1', 4, 4), corner('n2', 20, 20)])])
     expect(serializeDoc(docWith([line]))).toBe(`${ROOT_OPEN}\n  <path d="M4 4L20 20"/>\n</svg>`)

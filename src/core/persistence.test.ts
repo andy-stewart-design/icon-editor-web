@@ -9,6 +9,7 @@ import {
   type KeyValueStore,
   type SaveStatus,
 } from './persistence'
+import { legacyIconDoc } from './test-fixtures/legacy-icon-doc'
 
 class MemoryKV implements KeyValueStore {
   data = new Map<string, unknown>()
@@ -46,6 +47,16 @@ const docWith = (id: string): IconDoc => ({ ...createDefaultDoc(), id })
 const now = () => 1000
 
 describe('loadDocument', () => {
+  it('restores the exact legacy record selected by current without rewriting storage', async () => {
+    const kv = new MemoryKV()
+    kv.data.set('doc:other', docWith('other'))
+    kv.data.set('doc:legacy-icon', JSON.parse(JSON.stringify(legacyIconDoc)))
+    kv.data.set('current', legacyIconDoc.id)
+
+    expect(await loadDocument(kv, now)).toStrictEqual({ doc: legacyIconDoc, notice: null })
+    expect(kv.writes).toEqual([])
+  })
+
   it('restores a saved document', async () => {
     const kv = new MemoryKV()
     const doc = docWith('doc1')

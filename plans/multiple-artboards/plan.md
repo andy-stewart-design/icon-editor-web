@@ -46,9 +46,9 @@ Expected files:
 
 Tasks:
 
-- [ ] Characterize the legacy record with a non-default size, ordered paths, negative or overflowing coordinates, a curve with handles, and both inherited and overridden stroke styling. Pin the exact SVG from the v1 implementation, not output computed at test time from the migrated fixture.
-- [ ] Assert that the existing loader restores the literal record and Copy's serializer produces that expected SVG without cropping or reordering paths.
-- [ ] Satisfy verification and the completion gate, and record concise evidence.
+- [x] Characterize the legacy record with a non-default size, ordered paths, negative or overflowing coordinates, a curve with handles, and both inherited and overridden stroke styling. Pin the exact SVG from the v1 implementation, not output computed at test time from the migrated fixture.
+- [x] Assert that the existing loader restores the literal record and Copy's serializer produces that expected SVG without cropping or reordering paths.
+- [x] Satisfy verification and the completion gate, and record concise evidence.
 
 Verification: Run `pnpm test src/core/persistence.test.ts src/core/serialize/index.test.ts`. The seeded `current` entry resolves to the expected document and the SVG matches exactly. Browser proof is not part of this characterization.
 
