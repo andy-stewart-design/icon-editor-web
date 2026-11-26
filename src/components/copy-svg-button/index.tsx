@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { serializeDoc } from '../../core'
+import { serializeSvg } from '../../core'
 import { useEditorStore } from '../../hooks/use-editor'
 import { writeClipboardText } from '../../platform/clipboard'
 import FallbackDialog from './fallback-dialog'
@@ -20,7 +20,7 @@ export default function CopySvgButton() {
   }, [copied])
 
   const copy = async () => {
-    const markup = serializeDoc(store.getState().doc)
+    const markup = serializeSvg(store.getState().doc)
     try {
       await writeClipboardText(markup)
       setCopied(true)

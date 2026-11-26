@@ -75,10 +75,10 @@ Expected files:
 
 Tasks:
 
-- [ ] Give SVG serialization a narrow input: size, ordered paths, and shared stroke defaults. Keep board name, origin, selection, and workspace layout out of the standalone SVG input.
-- [ ] Point existing consumers at the narrow boundary without changing what the single-board editor displays or copies. Keep editor overflow presentation separate from export markup.
-- [ ] Extend serializer tests for two independent SVG inputs with different sizes and overlapping local geometry; keep the pinned v1 SVG assertion.
-- [ ] Satisfy verification and the completion gate, and record concise evidence.
+- [x] Give SVG serialization a narrow input: size, ordered paths, and shared stroke defaults. Keep board name, origin, selection, and workspace layout out of the standalone SVG input.
+- [x] Point existing consumers at the narrow boundary without changing what the single-board editor displays or copies. Keep editor overflow presentation separate from export markup.
+- [x] Extend serializer tests for two independent SVG inputs with different sizes and overlapping local geometry; keep the pinned v1 SVG assertion.
+- [x] Satisfy verification and the completion gate, and record concise evidence.
 
 Verification: Run `pnpm test src/core/serialize/index.test.ts` and `pnpm check`. Each size and path list serializes independently with full path geometry, no layout metadata, and unchanged v1 markup; affected callers type-check. No browser check is needed for this input-only refactor.
 

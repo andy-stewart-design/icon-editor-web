@@ -1,5 +1,10 @@
 import { formatNumber } from './format'
-import type { IconDoc, PathNode, Pt, Shape, Subpath } from '../model'
+import type { Linecap, Linejoin, PathNode, Pt, Shape, Subpath } from '../model'
+
+type StrokeDefaults = { strokeWidth: number; linecap: Linecap; linejoin: Linejoin }
+
+// One square board, with paths in paint order and coordinates local to the board.
+export type SvgInput = StrokeDefaults & { size: number; shapes: readonly Shape[] }
 
 type Attr = [string, string]
 
@@ -12,18 +17,13 @@ const escapeAttr = (v: string): string =>
 const attrString = (attrs: Attr[]): string =>
   attrs.map(([k, v]) => ` ${k}="${escapeAttr(v)}"`).join('')
 
-export function rootAttributes(doc: IconDoc): Attr[] {
-  const size = formatNumber(doc.size)
+export function presentationAttributes(defaults: StrokeDefaults): Attr[] {
   return [
-    ['xmlns', 'http://www.w3.org/2000/svg'],
-    ['width', size],
-    ['height', size],
-    ['viewBox', `0 0 ${size} ${size}`],
     ['fill', 'none'],
     ['stroke', 'currentColor'],
-    ['stroke-width', formatNumber(doc.strokeWidth)],
-    ['stroke-linecap', doc.linecap],
-    ['stroke-linejoin', doc.linejoin],
+    ['stroke-width', formatNumber(defaults.strokeWidth)],
+    ['stroke-linecap', defaults.linecap],
+    ['stroke-linejoin', defaults.linejoin],
   ]
 }
 
@@ -64,19 +64,27 @@ export function shapeAttributes(shape: Shape): Attr[] {
 }
 
 // One <path/> per shape that has any geometry; shapes with no nodes are skipped.
-const pathAttributes = (doc: IconDoc): Attr[][] =>
-  doc.shapes.map(shapeAttributes).filter((attrs) => attrs[0][1] !== '')
+const pathAttributes = (shapes: readonly Shape[]): Attr[][] =>
+  shapes.map(shapeAttributes).filter((attrs) => attrs[0][1] !== '')
 
 const pathElement = (attrs: Attr[]): string => `<path${attrString(attrs)}/>`
 
 // The <path/> elements alone, with no separator and no root <svg>.
-export function serializeBody(doc: IconDoc): string {
-  return pathAttributes(doc).map(pathElement).join('')
+export function serializeBody({ shapes }: Pick<SvgInput, 'shapes'>): string {
+  return pathAttributes(shapes).map(pathElement).join('')
 }
 
-export function serializeDoc(doc: IconDoc): string {
-  const open = `<svg${attrString(rootAttributes(doc))}>`
-  const paths = pathAttributes(doc)
+export function serializeSvg(input: SvgInput): string {
+  const size = formatNumber(input.size)
+  const attrs: Attr[] = [
+    ['xmlns', 'http://www.w3.org/2000/svg'],
+    ['width', size],
+    ['height', size],
+    ['viewBox', `0 0 ${size} ${size}`],
+    ...presentationAttributes(input),
+  ]
+  const open = `<svg${attrString(attrs)}>`
+  const paths = pathAttributes(input.shapes)
   if (paths.length === 0) return `${open}</svg>`
   const body = paths.map((attrs) => `\n  ${pathElement(attrs)}`).join('')
   return `${open}${body}\n</svg>`

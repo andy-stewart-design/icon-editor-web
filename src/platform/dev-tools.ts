@@ -1,5 +1,5 @@
 import {
-  serializeDoc,
+  serializeSvg,
   type EditorStore,
   type IconDoc,
   type NodeMode,
@@ -84,7 +84,7 @@ export function installDevTools(store: EditorStore): void {
   window.iconEditor = {
     store,
     doc: () => store.getState().doc,
-    svg: () => serializeDoc(store.getState().doc),
+    svg: () => serializeSvg(store.getState().doc),
     loadFixture: () =>
       store.dispatch({
         label: 'Load fixture',
