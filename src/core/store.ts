@@ -1,5 +1,5 @@
 import { createStore } from 'zustand/vanilla'
-import { createCommands, type Command, type Recipe } from './commands'
+import { createCommands, type Command, type GestureFinish, type Recipe } from './commands'
 import {
   emptyHistory,
   emptySelection,
@@ -122,7 +122,7 @@ export type EditorStore = {
   replaceDocument: (doc: IconDoc) => void
   begin: (label: string) => void
   update: (recipe: Recipe) => void
-  commit: (selectionAfter?: Selection) => void
+  commit: (selectionAfter?: Selection, finish?: GestureFinish) => void
   cancel: () => void
   bindHistoryInput: (input: HistoryInput) => () => void
   undo: () => void

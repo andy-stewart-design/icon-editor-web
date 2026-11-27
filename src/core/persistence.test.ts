@@ -1,4 +1,7 @@
-import { createEditorStore } from './store'
+import { activeBoard, createEditorStore } from './store'
+import { createSelectTool } from './tools/selectTool'
+import type { ToolEvent } from './tools/types'
+
 import { serializeSvg } from './serialize'
 import { artboardWorkspace, contentOfFirstBoard } from './test-fixtures/artboard-workspace'
 import { describe, expect, it } from 'vitest'
@@ -237,4 +240,46 @@ it('autosaves only the committed workspace, not canceled or in-flight previews',
   expect(doc.boards[0]).toEqual(small)
   expect(doc.boards[1].shapes[0].subpaths[0].nodes[0].p.x).toBe(-22)
   expect(doc).not.toHaveProperty('activeBoardId')
+})
+
+it('saves transferred ownership, but not a later interrupted Shape Select drag', async () => {
+  const kv = new MemoryKV()
+  const timer = manualTimer()
+  const autosave = createAutosave({ kv, schedule: timer.schedule, onStatus: () => {} })
+  const store = createEditorStore(artboardWorkspace)
+  store.subscribeCommitted(autosave.request)
+  const tool = createSelectTool(store)
+  const event = (x: number, y: number): ToolEvent => {
+    const { origin } = activeBoard(store.getState())
+    return {
+      workspacePt: { x, y },
+      pt: { x: x - origin.x, y: y - origin.y },
+      zoom: 16,
+      shift: false,
+      alt: false,
+      space: false,
+      suspendSnap: true,
+      snap: (point) => ({ point, targets: { x: null, y: null } }),
+    }
+  }
+  const [source, target] = artboardWorkspace.boards
+  const shape = source.shapes[0]
+  tool.pointerDown(event(0, 16.25))
+  tool.pointerMove(event(17, 16.25))
+  await autosave.flush()
+  expect(kv.writes).toEqual([])
+  tool.pointerUp(event(18, 16.25)) // release uses the current pointer, not the last move
+  const committed = store.getState().doc
+  expect(committed.boards[0].shapes).toEqual(source.shapes.slice(1))
+  expect(committed.boards[1].shapes.map(({ id }) => id)).toEqual([target.shapes[0].id, shape.id])
+  expect(committed.boards[1].shapes[1].subpaths[0].nodes[0].p.x).toBe(3 - 12.25 + 18 - 16.25)
+
+  tool.pointerDown(event(18, 16.25))
+  tool.pointerMove(event(1, 16.25))
+  expect(store.getState().doc).not.toBe(committed)
+  await autosave.flush()
+  expect(kv.writes).toEqual([docKey(committed.id), CURRENT_KEY])
+  const restored = await loadDocument(kv, now)
+  expect(restored.restored).toBe(true)
+  expect(restored.doc).toEqual(committed)
 })

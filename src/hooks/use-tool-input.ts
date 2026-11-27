@@ -97,8 +97,11 @@ function toolEvent(store: EditorStore, local: Pt, mods: Modifiers, space: boolea
   const state = store.getState()
   const { viewport } = state.ui
   const suspendSnap = mods.metaKey || mods.ctrlKey
+  const { width, height } = state.ui.canvasSize
+  const inside = local.x >= 0 && local.x < width && local.y >= 0 && local.y < height
   return {
     pt: screenToDoc(activeViewport(state), local),
+    workspacePt: inside ? screenToDoc(viewport, local) : undefined,
     zoom: viewport.zoom,
     shift: mods.shiftKey,
     alt: mods.altKey,
@@ -204,7 +207,7 @@ export function useToolInput(): ToolInput {
       if (!refresh) return
       const current = toolRef.current
       if (gestureRef.current) {
-        if (current?.beforeHistory && next.doc !== previousDoc) {
+        if (current?.beforeHistory && current.refreshHover && next.doc !== previousDoc) {
           current.refreshHover?.() // validate a held Pen target against external geometry edits
           bump()
         }
@@ -262,7 +265,8 @@ export function useToolInput(): ToolInput {
           gestureRef.current ||
           tx ||
           !isNodeSelect(ui) ||
-          e.currentTarget.dataset.pan
+          e.currentTarget.dataset.pan ||
+          e.currentTarget.dataset.boardDrag
         )
           return
         const tool = toolRef.current
@@ -274,7 +278,7 @@ export function useToolInput(): ToolInput {
         const tool = toolRef.current
         if (!tool || e.button !== 0 || gestureRef.current) return
         // Viewport pan (middle button or Space drag) owns the pointer. Its listener runs before this one.
-        if (e.currentTarget.dataset.pan) return
+        if (e.currentTarget.dataset.pan || e.currentTarget.dataset.boardDrag) return
         // Before the first measurement the view is not fitted, so drawing there would place shapes wrongly.
         const { canvasSize } = store.getState().ui
         if (canvasSize.width === 0 || canvasSize.height === 0) return
@@ -289,6 +293,7 @@ export function useToolInput(): ToolInput {
         bump()
       },
       onPointerMove(e) {
+        if (e.currentTarget.dataset.boardDrag) return
         const tool = toolRef.current
         const g = gestureRef.current
         // Plain moves (no press) reach only tools with a hover method: the select highlight and the pen rubber band.
@@ -306,7 +311,8 @@ export function useToolInput(): ToolInput {
         tool.pointerMove(toolEvent(store, g.local, e, spaceRef.current))
         bump()
       },
-      onPointerLeave() {
+      onPointerLeave(e) {
+        if (e.currentTarget.dataset.boardDrag) return
         hoverRef.current = null
         setHoverPosition(null)
         if (gestureRef.current) return
@@ -425,6 +431,17 @@ export function useToolInput(): ToolInput {
         const g = gestureRef.current
         if (!g || !shouldResend(e)) return
         tool.pointerMove(toolEvent(store, g.local, e, spaceRef.current))
+        bump()
+      },
+      { signal },
+    )
+
+    window.addEventListener(
+      'blur',
+      () => {
+        if (!gestureRef.current || toolContext(store.getState().ui) !== 'shape-select') return
+        releaseGesture(gestureRef)
+        toolRef.current?.pointerCancel()
         bump()
       },
       { signal },

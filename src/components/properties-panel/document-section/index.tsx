@@ -106,7 +106,9 @@ export default function DocumentSection() {
           onChange={(join) => store.dispatch(setDocLinejoin(join))}
         />
         <NumberField
+          key={board.id}
           id="doc-artboard-size"
+          disabled={editing}
           label="Artboard"
           value={board.size}
           validate={validateArtboardSize}

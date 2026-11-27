@@ -1,8 +1,13 @@
-import { contentOfFirstBoard, workspaceWithShapes } from '../test-fixtures/artboard-workspace'
+import {
+  artboardWorkspace,
+  contentOfFirstBoard,
+  workspaceWithShapes,
+} from '../test-fixtures/artboard-workspace'
 import { describe, expect, it } from 'vitest'
 import { makeLine, makeRect } from '../geometry/shapes'
 import { selectionBounds } from '../geometry/bounds'
 import { type PathShape } from '../model'
+import { validateArtboardSize } from '../validation'
 import { createEditorStore } from '../store'
 import { resizeArtboard, setDocLinecap, setDocStrokeWidth } from './document'
 import {
@@ -170,4 +175,38 @@ describe('setSelectionBounds', () => {
     store.dispatch(setSelectionBounds(sel, 2, 2, 4, 6))
     expect(store.getState().history.past).toHaveLength(0)
   })
+})
+
+it.each(['keep', 'scale'] as const)('resizes only the active board in %s mode', (mode) => {
+  const [other, source] = artboardWorkspace.boards
+  const store = createEditorStore(artboardWorkspace)
+  store.activateBoard(source.id)
+  store.dispatch(resizeArtboard(64, mode))
+  const doc = store.getState().doc
+  const board = doc.boards[1]
+  expect(doc.boards[0]).toBe(other)
+  expect(board.id).toBe(source.id)
+  expect(board.origin).toBe(source.origin)
+  expect(board.size).toBe(64)
+  expect(board.shapes.map((shape) => shape.id)).toEqual(source.shapes.map((shape) => shape.id))
+  expect(board.shapes[0].style).toEqual(source.shapes[0].style)
+  expect(doc.strokeWidth).toBe(artboardWorkspace.strokeWidth)
+  const factor = mode === 'keep' ? 1 : 2
+  expect(anchors(board.shapes[0])).toEqual(
+    anchors(source.shapes[0]).map(({ x, y }) => ({ x: x * factor, y: y * factor })),
+  )
+  store.undo()
+  expect(store.getState().doc).toBe(artboardWorkspace)
+})
+
+it('rejects invalid size text and invalid direct resize commands without changing either board', () => {
+  const store = createEditorStore(artboardWorkspace)
+  store.activateBoard(artboardWorkspace.boards[1].id)
+  for (const text of ['', 'no', '7', '257', '24.5', 'Infinity']) {
+    expect(validateArtboardSize(text)).toEqual({ ok: false })
+    for (const mode of ['keep', 'scale'] as const)
+      store.dispatch(resizeArtboard(Number(text), mode))
+  }
+  expect(store.getState().doc).toBe(artboardWorkspace)
+  expect(store.canUndo()).toBe(false)
 })

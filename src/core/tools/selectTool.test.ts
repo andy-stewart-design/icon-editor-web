@@ -168,15 +168,21 @@ describe('select tool handles', () => {
   it('dragging the se handle resizes as one history entry; the rotate handle rotates; Esc restores', () => {
     const r = makeRect(4, 4, 8, 8)
     if (!r) throw new Error('degenerate rect')
-    const store = createEditorStore(docWith([r]))
+    const doc = docWith([r])
+    const target = { id: 'target', name: 'Target', origin: { x: 14, y: 3 }, size: 24, shapes: [] }
+    doc.boards.push(target)
+    const store = createEditorStore(doc)
     store.setUi({ snapEnabled: false })
     store.setSelection({ shapeIds: [r.id], nodes: [] })
     const original = store.getState().doc
     const tool = createSelectTool(store)
 
     tool.pointerDown(ev(12, 12)) // the se corner
-    tool.pointerMove(ev(20, 20))
-    tool.pointerUp(ev(20, 20))
+    const drop = ev(20, 20, { workspacePt: { x: 20, y: 20 } })
+    tool.pointerMove(drop)
+    expect(tool.overlay().some(({ kind }) => kind === 'transferTarget')).toBe(false)
+    tool.pointerUp(drop)
+    expect(store.getState().doc.boards[1]).toBe(target)
     expect(selectionBounds([store.getState().doc.boards[0].shapes[0]])).toEqual({
       x: 4,
       y: 4,
@@ -215,3 +221,129 @@ describe('select tool cursor', () => {
     expect(tool.cursor).toBe('default')
   })
 })
+
+function transferSetup(sourceOnTop = false) {
+  const a = hline(4)
+  a.subpaths[0].nodes[0].hOut = { x: 7, y: 4 }
+  a.subpaths[0].nodes[1].hIn = { x: 17, y: 4 }
+  const b = hline(8)
+  const stay = hline(20)
+  const existing = [hline(10), hline(12)]
+  const doc = docWith([a, stay, b])
+  const source = doc.boards[0]
+  source.origin = { x: -10, y: 5 }
+  const target = {
+    id: 'target',
+    name: 'Target',
+    size: 16,
+    origin: { x: 8.125, y: 3 },
+    shapes: existing,
+  }
+  if (sourceOnTop) doc.boards.unshift(target)
+  else doc.boards.push(target)
+  const store = createEditorStore(doc)
+  store.activateBoard(source.id)
+  store.setSelection({ shapeIds: [b.id, a.id], nodes: [] })
+  const tool = createSelectTool(store)
+  const sample = (x: number, y = 4) => ev(x, y, { workspacePt: { x: x - 10, y: y + 5 } })
+  const cue = () => tool.overlay().find(({ kind }) => kind === 'transferTarget')
+  const board = (id: string) => store.getState().doc.boards.find((b) => b.id === id)
+  const original = store.getState().doc
+  const saves: IconDoc[] = []
+  store.subscribeCommitted((doc) => saves.push(doc))
+  // An offset grab on the stroke, away from group transform handles.
+  tool.pointerDown(sample(5))
+  return { a, b, stay, existing, source, target, store, tool, sample, cue, board, original, saves }
+}
+
+it('transfers the selected group at the raw cursor, without resnapping, in one committed edit', () => {
+  const { a, b, stay, existing, source, target, store, tool, sample, cue, board, original, saves } =
+    transferSetup()
+  // Cursor is just inside the target, but a snapped cursor would be outside.
+  const drop = sample(18.15)
+  tool.pointerMove(drop)
+  expect(cue()).toEqual({ kind: 'transferTarget', boardId: target.id })
+  expect(store.getState().activeBoardId).toBe(source.id)
+  expect(saves).toEqual([])
+  const preview = board(source.id)!.shapes
+  tool.pointerUp(drop)
+  const after = store.getState().doc
+  expect(cue()).toBeUndefined()
+  expect(board(source.id)?.shapes).toEqual([stay])
+  expect(board(target.id)?.shapes.map(({ id }) => id)).toEqual([
+    ...existing.map(({ id }) => id),
+    a.id,
+    b.id,
+  ])
+  expect(board(target.id)?.shapes.slice(0, 2)).toEqual(existing)
+  for (const [i, shape] of board(target.id)!.shapes.slice(2).entries()) {
+    const before = preview.filter(({ id }) => id !== stay.id)[i]
+    for (const [j, node] of shape.subpaths[0].nodes.entries()) {
+      const prior = before.subpaths[0].nodes[j]
+      expect(node.id).toBe(prior.id)
+      for (const key of ['p', 'hIn', 'hOut'] as const) {
+        if (!prior[key]) expect(node[key]).toBeUndefined()
+        else {
+          expect(node[key]!.x + target.origin.x).toBeCloseTo(prior[key].x + source.origin.x)
+          expect(node[key]!.y + target.origin.y).toBeCloseTo(prior[key].y + source.origin.y)
+        }
+      }
+    }
+  }
+  expect(store.getState().activeBoardId).toBe(target.id)
+  expect(store.getState().selection.shapeIds).toEqual([b.id, a.id])
+  tool.pointerUp(drop)
+  tool.pointerCancel()
+  expect(saves).toEqual([after])
+  expect(store.getState().history.past).toHaveLength(1)
+  store.undo()
+  expect(store.getState().doc).toBe(original)
+  expect(store.getState().activeBoardId).toBe(source.id)
+  store.redo()
+  expect(store.getState().doc).toBe(after)
+  expect(store.getState().activeBoardId).toBe(target.id)
+  expect(store.getState().selection.shapeIds).toEqual([b.id, a.id])
+})
+
+it.each(['source on top', 'blank drop', 'outside canvas'] as const)(
+  'moves without transfer: %s',
+  (kind) => {
+    const { source, target, store, tool, sample, cue, board } = transferSetup(
+      kind === 'source on top',
+    )
+    tool.pointerMove(sample(20))
+    expect(Boolean(cue())).toBe(kind !== 'source on top')
+    // The shape can overlap the target even when the offset cursor is off the boards.
+    const drop = kind === 'blank drop' ? sample(36) : sample(20)
+    if (kind === 'outside canvas') delete drop.workspacePt
+    tool.pointerUp(drop)
+    expect(cue()).toBeUndefined()
+    expect(board(source.id)?.shapes.map(({ id }) => id)).toEqual(source.shapes.map(({ id }) => id))
+    expect(board(source.id)?.shapes[0]).not.toEqual(source.shapes[0])
+    expect(board(target.id)).toBe(target)
+    expect(store.getState().history.past).toHaveLength(1)
+  },
+)
+
+it.each(['Escape', 'pointer cancel'] as const)(
+  'clears a transfer preview on %s and ignores late events',
+  (cancel) => {
+    const { original, source, store, tool, sample, cue, saves } = transferSetup()
+    const drop = sample(20)
+    tool.pointerMove(drop)
+    expect(cue()).toBeDefined()
+    tool.pointerMove(sample(36))
+    expect(cue()).toBeUndefined()
+    tool.pointerMove(drop)
+    if (cancel === 'Escape') tool.keyDown(cancel)
+    else tool.pointerCancel()
+    tool.pointerMove(drop)
+    tool.pointerUp(drop)
+    expect(cue()).toBeUndefined()
+    expect(store.getState().doc).toBe(original)
+    expect(store.getState().activeBoardId).toBe(source.id)
+    expect(store.getState().tx).toBeNull()
+    expect(store.getState().history.past).toEqual([])
+    expect(saves).toEqual([])
+  },
+)

@@ -8,6 +8,7 @@ export type SnapFn = (pt: Pt) => SnapResult
 
 export type ToolEvent = {
   pt: Pt // pointer position in document space
+  workspacePt?: Pt // raw cursor in the visible workspace; absent outside the canvas
   zoom: number
   shift: boolean
   alt: boolean
@@ -19,6 +20,7 @@ export type ToolEvent = {
 // Plain data in document space. The UI layer decides how to draw each primitive.
 export type OverlayPrimitive =
   | { kind: 'contourPreview'; shapeId: string; previous: Subpath; next: Subpath }
+  | { kind: 'transferTarget'; boardId: string }
   | { kind: 'draft'; shape: PathShape }
   | { kind: 'snapPoint'; p: Pt } // an anchor target was hit
   | { kind: 'snapLine'; axis: 'x' | 'y'; value: number } // a straight target (edge, center or guide) was hit

@@ -60,6 +60,15 @@ export default function ToolOverlay({ primitives }: { primitives: OverlayPrimiti
   return (
     <svg className={s.layer} aria-hidden="true">
       {primitives.map((p, i) => {
+        if (p.kind === 'transferTarget') {
+          const board = workspace.boards.find(({ id }) => id === p.boardId)
+          if (!board) return null
+          const { x, y } = docToScreen(workspaceVp, board.origin)
+          const extent = board.size * workspaceVp.zoom
+          return (
+            <rect key={i} className={s.transferTarget} x={x} y={y} width={extent} height={extent} />
+          )
+        }
         if (p.kind === 'draft') {
           return (
             <g key={i} transform={`translate(${origin.x} ${origin.y}) scale(${vp.zoom})`}>

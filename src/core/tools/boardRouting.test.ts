@@ -21,6 +21,7 @@ function setup() {
     const state = store.getState()
     return {
       pt: screenToDoc(activeViewport(state), screen(world)),
+      workspacePt: world,
       zoom: 16,
       shift: false,
       alt: false,

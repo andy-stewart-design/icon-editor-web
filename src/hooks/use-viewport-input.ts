@@ -45,7 +45,7 @@ export function useViewportInput(ref: RefObject<HTMLDivElement | null>): void {
     // A draw in progress (data-drawing, set by use-tool-input) keeps the crosshair. Space then moves the shape.
     const syncCursor = () => {
       if (drag) el.dataset.pan = 'drag'
-      else if (spaceHeld && !el.dataset.drawing) el.dataset.pan = 'space'
+      else if (spaceHeld && !el.dataset.drawing && !el.dataset.boardDrag) el.dataset.pan = 'space'
       else delete el.dataset.pan
     }
 
@@ -53,6 +53,7 @@ export function useViewportInput(ref: RefObject<HTMLDivElement | null>): void {
       'wheel',
       (e) => {
         e.preventDefault()
+        if (el.dataset.boardDrag) return
         const pt = local(e)
         const { ui } = store.getState()
         const d = wheelPx(e, ui.canvasSize.height)
@@ -71,7 +72,7 @@ export function useViewportInput(ref: RefObject<HTMLDivElement | null>): void {
       'gesturestart',
       (e) => {
         e.preventDefault()
-        gestureStart = store.getState().ui.viewport
+        gestureStart = el.dataset.boardDrag ? null : store.getState().ui.viewport
       },
       { signal },
     )
@@ -79,7 +80,7 @@ export function useViewportInput(ref: RefObject<HTMLDivElement | null>): void {
       'gesturechange',
       (e) => {
         e.preventDefault()
-        if (!gestureStart) return
+        if (!gestureStart || el.dataset.boardDrag) return
         const pt = last ?? { x: el.clientWidth / 2, y: el.clientHeight / 2 }
         store.setUi({
           viewport: zoomAt(gestureStart, gestureStart.zoom * (e as GestureEvent).scale, pt),
@@ -99,6 +100,7 @@ export function useViewportInput(ref: RefObject<HTMLDivElement | null>): void {
       'pointerdown',
       (e) => {
         // Space + press during a draw moves the shape instead of panning, so it never starts a pan.
+        if (el.dataset.boardDrag) return
         const spacePan = e.button === 0 && spaceHeld && !el.dataset.drawing
         if (!(e.button === 1 || spacePan)) return
         e.preventDefault() // stops middle-click autoscroll

@@ -159,10 +159,10 @@ Expected files:
 
 Tasks:
 
-- [ ] Give the board label its own hit region. Click activates it; drag changes only its workspace origin, including when artwork overflows or the board ends on top of another. Keep label gestures out of shape drawing and commit one undoable move; canceled movement leaves the original layout.
-- [ ] Apply the existing **Stay in place** and **Scale shapes** choices to the active board only. Retain integer 8–256 field validation and do not scale stroke widths. Keep guides and artwork aligned through moves and resizing.
-- [ ] Test that the moved board exports identical SVG, neither move nor resize reassigns ownership, and invalid size input leaves both boards unchanged.
-- [ ] Satisfy verification and the completion gate, and record concise evidence.
+- [x] Give the board label its own hit region. Click activates it; drag changes only its workspace origin, including when artwork overflows or the board ends on top of another. Keep label gestures out of shape drawing and commit one undoable move; canceled movement leaves the original layout.
+- [x] Apply the existing **Stay in place** and **Scale shapes** choices to the active board only. Retain integer 8–256 field validation and do not scale stroke widths. Keep guides and artwork aligned through moves and resizing.
+- [x] Test that the moved board exports identical SVG, neither move nor resize reassigns ownership, and invalid size input leaves both boards unchanged.
+- [x] Satisfy verification and the completion gate, and record concise evidence.
 
 Verification:
 
@@ -192,10 +192,10 @@ Expected files:
 
 Tasks:
 
-- [ ] Resolve a destination from the raw workspace cursor and rendered board stack. Use the same lookup for preview and release, counting the source board in the topmost test. Clear the cue on exit, cancellation or release; do not activate the hovered board before a successful transfer.
-- [ ] Keep the drag in its source context until release. If the topmost target differs, apply the final translation and rebase anchors and handles into target-local coordinates without resnapping. Retain shape IDs and relative draw order, select the moved group in the active destination, and commit the move and ownership together.
-- [ ] Treat blank space and source-topmost drops as moves only. Handle Escape and pointer termination without stale cues or double commits. Leave all non-translation edits out of the transfer path.
-- [ ] Extend tests for offset grabs, blank space, both overlap orders, translation without a jump, a multi-shape group, history, and canceled previews not reaching the committed snapshot.
+- [x] Resolve a destination from the raw workspace cursor and rendered board stack. Use the same lookup for preview and release, counting the source board in the topmost test. Clear the cue on exit, cancellation or release; do not activate the hovered board before a successful transfer.
+- [x] Keep the drag in its source context until release. If the topmost target differs, apply the final translation and rebase anchors and handles into target-local coordinates without resnapping. Retain shape IDs and relative draw order, select the moved group in the active destination, and commit the move and ownership together.
+- [x] Treat blank space and source-topmost drops as moves only. Handle Escape and pointer termination without stale cues or double commits. Leave all non-translation edits out of the transfer path.
+- [x] Extend tests for offset grabs, blank space, both overlap orders, translation without a jump, a multi-shape group, history, and canceled previews not reaching the committed snapshot.
 - [ ] Satisfy verification and the completion gate, and record concise evidence.
 
 Verification:

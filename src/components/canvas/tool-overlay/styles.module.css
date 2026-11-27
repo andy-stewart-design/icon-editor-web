@@ -97,3 +97,10 @@
   stroke: #087d62;
   stroke-width: 2px;
 }
+
+.transferTarget {
+  fill: rgb(30 123 224 / 8%);
+  stroke: #1e7be0;
+  stroke-width: 2px;
+  stroke-dasharray: 5 3;
+}

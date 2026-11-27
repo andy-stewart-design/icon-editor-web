@@ -23,3 +23,34 @@
   height: 100%;
   pointer-events: none;
 }
+
+.boardLabel {
+  position: absolute;
+  transform: translateY(-100%);
+  max-width: 12rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 2px 5px;
+  border: 0;
+  background: transparent;
+  color: #777;
+  font: inherit;
+  font-size: 12px;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.boardLabel[aria-pressed='true'] {
+  z-index: 1;
+  color: #111;
+}
+
+.canvas[data-pan] .boardLabel {
+  cursor: inherit;
+}
+
+.canvas[data-board-drag] .boardLabel {
+  cursor: grabbing;
+}

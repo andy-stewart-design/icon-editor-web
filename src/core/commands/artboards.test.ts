@@ -4,7 +4,13 @@ import { boardContent } from '../model'
 import { serializeSvg } from '../serialize'
 import { activeBoard, createEditorStore } from '../store'
 import { artboardWorkspace } from '../test-fixtures/artboard-workspace'
-import { addArtboard, deleteArtboard, duplicateArtboard, renameArtboard } from './artboards'
+import {
+  addArtboard,
+  deleteArtboard,
+  duplicateArtboard,
+  moveArtboard,
+  renameArtboard,
+} from './artboards'
 
 it('adds an empty board in the first free spot to the right without altering the source', () => {
   const store = createEditorStore(artboardWorkspace)
@@ -84,4 +90,50 @@ it('does not record deleting the final board or renaming it to a blank or unchan
   expect(store.getState().activeBoardId).toBe(board.id)
   expect(store.getState().selection).toEqual(before.selection)
   expect(store.canUndo()).toBe(false)
+})
+
+it('moves an overflowing board over another without changing either SVG, in one committed edit', () => {
+  const doc = artboardWorkspace
+  const [other, source] = doc.boards
+  const svg = serializeSvg(boardContent(doc, source))
+  const store = createEditorStore(doc)
+  const saved: unknown[] = []
+  store.subscribeCommitted((next) => saved.push(next))
+  store.activateBoard(source.id)
+  const move = moveArtboard(other.origin)
+  store.begin(move.label)
+  store.update(moveArtboard({ x: -3, y: 4 }).recipe)
+  store.update(move.recipe)
+  const moved = store.getState().doc
+  expect(moved.boards[1]).toEqual({ ...source, origin: other.origin })
+  expect(moved.boards[1].shapes).toBe(source.shapes)
+  expect(moved.boards[0]).toBe(other)
+  expect(serializeSvg(boardContent(moved, moved.boards[1]))).toBe(svg)
+  expect(saved).toHaveLength(0)
+  store.commit()
+  expect(saved).toEqual([moved])
+  store.undo()
+  expect(store.getState().doc).toBe(doc)
+  expect(store.canUndo()).toBe(false)
+  store.redo()
+  expect(store.getState().doc).toBe(moved)
+  expect(activeBoard(store.getState()).id).toBe(source.id)
+})
+
+it('restores the starting layout without saving or recording a canceled or zero-distance move', () => {
+  const store = createEditorStore(artboardWorkspace)
+  const board = activeBoard(store.getState())
+  const saved: unknown[] = []
+  store.subscribeCommitted((next) => saved.push(next))
+  store.begin('Move artboard')
+  store.update(moveArtboard({ x: 9, y: 12 }).recipe)
+  store.cancel()
+  expect(store.getState().doc).toBe(artboardWorkspace)
+  store.begin('Move artboard')
+  store.update(moveArtboard({ x: 9, y: 12 }).recipe)
+  store.update(moveArtboard(board.origin).recipe)
+  store.commit()
+  expect(store.getState().doc).toBe(artboardWorkspace)
+  expect(store.canUndo()).toBe(false)
+  expect(saved).toHaveLength(0)
 })

@@ -7,7 +7,9 @@ import {
   type HandleId,
 } from '../commands/transform'
 import { translateRecipe } from '../commands/selection'
-import type { Recipe } from '../commands'
+import { transferShapesRecipe } from '../commands/artboards'
+import { boardAt } from './boardPoint'
+import type { GestureFinish, Recipe } from '../commands'
 import type { Selection } from '../history'
 import { selectionBounds, type Rect } from '../geometry/bounds'
 import { distanceToShape, shapeIntersectsRect } from '../geometry/hit'
@@ -31,7 +33,7 @@ export type SelectHost = {
   setSelection: (selection: Selection) => void
   begin: (label: string) => void
   update: (recipe: Recipe) => void
-  commit: (selectionAfter?: Selection) => void
+  commit: (selectionAfter?: Selection, finish?: GestureFinish) => void
   cancel: () => void
 }
 
@@ -73,6 +75,7 @@ const unionIds = (base: readonly string[], more: readonly string[]): string[] =>
 
 type Move = {
   kind: 'move'
+  destinationId?: string
   start: Pt // pointer at press
   ref: Pt // top-left of the selection bounds at press; the reference point that snaps
   ids: string[] // shapes moved by the gesture
@@ -134,6 +137,9 @@ export function createSelectTool(host: SelectHost): SelectTool {
     const s = snap({ x: m.ref.x + dx, y: m.ref.y + dy })
     host.update(translateRecipe(m.ids, s.point.x - m.ref.x, s.point.y - m.ref.y))
     m.indicator = snapIndicator(s.targets)
+    const { doc, activeBoardId } = host.getState()
+    const target = e.workspacePt && boardAt(doc, e.workspacePt)
+    m.destinationId = target && target.id !== activeBoardId ? target.id : undefined
   }
 
   const noop: Recipe = () => {}
@@ -277,7 +283,20 @@ export function createSelectTool(host: SelectHost): SelectTool {
           after = { shapeIds: [m.pressed], nodes: [] }
         }
       }
-      host.commit(after)
+      if (m.destinationId) {
+        host.commit(
+          { shapeIds: m.ids, nodes: [] },
+          {
+            recipe: transferShapesRecipe(m.ids, m.destinationId),
+            activeBoardAfter: m.destinationId,
+          },
+        )
+      } else host.commit(after)
+    },
+
+    beforeHistory() {
+      cancelGesture()
+      return false
     },
 
     pointerCancel() {
@@ -291,8 +310,11 @@ export function createSelectTool(host: SelectHost): SelectTool {
     overlay() {
       const out: OverlayPrimitive[] = []
       if (mode?.kind === 'marquee') out.push({ kind: 'marquee', rect: mode.rect })
-      else if (mode?.kind === 'move' || mode?.kind === 'resize') out.push(...mode.indicator)
-      else if (hovered !== null) out.push({ kind: 'hover', shapeId: hovered })
+      else if (mode?.kind === 'move' || mode?.kind === 'resize') {
+        out.push(...mode.indicator)
+        if (mode.kind === 'move' && mode.destinationId)
+          out.push({ kind: 'transferTarget', boardId: mode.destinationId })
+      } else if (hovered !== null) out.push({ kind: 'hover', shapeId: hovered })
       return out
     },
 

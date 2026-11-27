@@ -19,6 +19,8 @@ export type Command = {
   activeBoardAfter?: string
 }
 
+export type GestureFinish = { recipe: Recipe; activeBoardAfter: string }
+
 type StateApi = {
   getState: () => EditorState
   setState: (patch: Partial<EditorState>) => void
@@ -33,13 +35,15 @@ export function createCommands(
   selectionFor: (sel: Selection, doc: IconDoc, boardId: string) => Selection,
 ) {
   // Records one entry and notifies, unless the recipe left the doc reference unchanged.
-  const record = (entry: HistoryEntry): void => {
+  const record = (entry: HistoryEntry, endGesture = false): void => {
+    const patch = endGesture ? { tx: null } : {}
     const { history } = api.getState()
     if (entry.before === entry.after) {
-      api.setState({ selection: entry.selectionAfter })
+      api.setState({ ...patch, selection: entry.selectionAfter })
       return
     }
     api.setState({
+      ...patch,
       doc: entry.after,
       activeBoardId: entry.boardAfterId,
       selection: entry.selectionAfter,
@@ -90,19 +94,25 @@ export function createCommands(
     })
   }
 
-  const commit = (selectionAfter?: Selection): void => {
+  const commit = (selectionAfter?: Selection, finish?: GestureFinish): void => {
     const { doc, selection, tx } = api.getState()
     if (!tx) return
-    api.setState({ tx: null })
-    record({
-      boardBeforeId: tx.boardId,
-      boardAfterId: tx.boardId,
-      label: tx.label,
-      before: tx.base,
-      after: doc,
-      selectionBefore: tx.selectionBefore,
-      selectionAfter: selectionFor(selectionAfter ?? selection, doc, tx.boardId),
-    })
+    const after = finish
+      ? produce(doc, (draft) => finish.recipe(artboardFor(draft, tx.boardId), draft))
+      : doc
+    const boardAfterId = artboardFor(after, finish?.activeBoardAfter ?? tx.boardId).id
+    record(
+      {
+        boardBeforeId: tx.boardId,
+        boardAfterId,
+        label: tx.label,
+        before: tx.base,
+        after,
+        selectionBefore: tx.selectionBefore,
+        selectionAfter: selectionFor(selectionAfter ?? selection, after, boardAfterId),
+      },
+      true,
+    )
   }
 
   // Swaps the whole document (New document). Drops any open transaction, history and selection.

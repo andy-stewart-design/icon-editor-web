@@ -3,6 +3,8 @@ import { activeBoard, boardContent, initialWorkspaceViewport } from '../../core'
 import { useEditor, useEditorStore } from '../../hooks/use-editor'
 import { useToolInput } from '../../hooks/use-tool-input'
 import { useViewportInput } from '../../hooks/use-viewport-input'
+import ArtboardLabels from './artboard-labels'
+
 import ContentLayer from './content-layer'
 import GridLayer from './grid-layer'
 import KeylineLayer from './keyline-layer'
@@ -94,6 +96,7 @@ export default function Canvas() {
           <SelectionOverlay />
           <NodeOverlay />
           <ToolOverlay primitives={tools.primitives} />
+          <ArtboardLabels canvasRef={ref} />
         </>
       )}
     </div>

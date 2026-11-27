@@ -1,7 +1,8 @@
-import type { Command } from '../commands'
+import type { Command, Recipe } from '../commands'
 import { newId } from '../ids'
 import { artboardFor, type Artboard, type IconDoc } from '../model'
 import { cloneWithNewIds } from './arrange'
+import { translateRecipe } from './selection'
 
 function insertArtboard(
   doc: IconDoc,
@@ -68,5 +69,33 @@ export function deleteArtboard(): Command {
     recipe: (board, draft) => {
       if (draft.boards.length > 1) draft.boards.splice(draft.boards.indexOf(board), 1)
     },
+  }
+}
+
+export function moveArtboard(origin: Artboard['origin']): Command {
+  const { x, y } = origin
+  return {
+    label: 'Move artboard',
+    recipe: (board) => {
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return
+      board.origin.x = x
+      board.origin.y = y
+    },
+  }
+}
+
+// Rebase the already translated artwork, then append in source draw order above existing artwork.
+export function transferShapesRecipe(ids: readonly string[], destinationId: string): Recipe {
+  const selected = new Set(ids)
+  return (source, draft) => {
+    const destination = draft.boards.find(({ id }) => id === destinationId)
+    if (!destination || source === destination) return
+    translateRecipe(
+      ids,
+      source.origin.x - destination.origin.x,
+      source.origin.y - destination.origin.y,
+    )(source, draft)
+    destination.shapes.push(...source.shapes.filter(({ id }) => selected.has(id)))
+    source.shapes = source.shapes.filter(({ id }) => !selected.has(id))
   }
 }
