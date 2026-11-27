@@ -1,5 +1,7 @@
+import { activeContent, createEditorStore } from '../store'
+import { artboardWorkspace } from '../test-fixtures/artboard-workspace'
 import { describe, expect, it } from 'vitest'
-import type { PathNode, PathShape, Subpath } from '../model'
+import { boardContent, parseIconDoc, type PathNode, type PathShape, type Subpath } from '../model'
 import { legacyIconDoc, legacyIconSvg } from '../test-fixtures/legacy-icon-doc'
 import { serializeSvg, type SvgInput } from '.'
 
@@ -19,7 +21,9 @@ const ROOT_OPEN =
 
 describe('serializeSvg', () => {
   it('matches the full legacy SVG without cropping or reordering paths', () => {
-    expect(serializeSvg(legacyIconDoc)).toBe(legacyIconSvg)
+    const parsed = parseIconDoc(legacyIconDoc)
+    if (parsed.kind !== 'ok') throw new Error('expected legacy migration')
+    expect(serializeSvg(boardContent(parsed.doc, parsed.doc.boards[0]))).toBe(legacyIconSvg)
   })
 
   it('exports each board independently even when their local paths overlap', () => {
@@ -33,6 +37,19 @@ describe('serializeSvg', () => {
       `${ROOT_OPEN}\n  <path d="M4 4L30 4"/>\n  <path d="M4 4L-3 4"/>\n</svg>`,
     )
     expect(serializeSvg(large)).toBe(`${largeRoot}\n  <path d="M4 4L4 60"/>\n</svg>`)
+  })
+
+  it('takes all and only the active board paths despite selection', () => {
+    const store = createEditorStore(artboardWorkspace)
+    store.setSelection({ shapeIds: ['small-interior'], nodes: [] })
+    expect(serializeSvg(activeContent(store.getState()))).toBe(
+      `${ROOT_OPEN}\n  <path d="M3 8L34 8"/>\n  <path d="M8 14L18 19"/>\n</svg>`,
+    )
+    store.activateBoard('large')
+    store.setSelection({ shapeIds: ['large-overflow'], nodes: [] })
+    expect(serializeSvg(activeContent(store.getState()))).toBe(
+      `${ROOT_OPEN.replaceAll('24', '32')}\n  <path d="M-12 15L24 15"/>\n</svg>`,
+    )
   })
 
   it('matches the spec example exactly', () => {

@@ -11,11 +11,15 @@ export const docKey = (id: string): string => `doc:${id}`
 const backupKey = (id: string | null, timestamp: number): string =>
   `backup:${id ?? 'unknown'}:${timestamp}`
 
-export type LoadResult = { doc: IconDoc; notice: null | 'recovered' }
+export type LoadResult = { doc: IconDoc; notice: null | 'recovered'; restored: boolean }
 
 // Resolves with a document in every recoverable case. Rejects only when storage itself fails.
 export async function loadDocument(kv: KeyValueStore, now: () => number): Promise<LoadResult> {
-  const fresh = (notice: LoadResult['notice']): LoadResult => ({ doc: createDefaultDoc(), notice })
+  const fresh = (notice: LoadResult['notice']): LoadResult => ({
+    doc: createDefaultDoc(),
+    notice,
+    restored: false,
+  })
 
   // Keeps the unreadable value under a fresh backup key, probing past existing keys so nothing is overwritten.
   // If the backup fails we still open a new doc: its id is new, so no stored record is overwritten either way.
@@ -38,7 +42,7 @@ export async function loadDocument(kv: KeyValueStore, now: () => number): Promis
   const raw = await kv.get(docKey(currentId))
   if (raw === undefined) return fresh(null)
   const parsed = parseIconDoc(raw)
-  if (parsed.kind === 'ok') return { doc: parsed.doc, notice: null }
+  if (parsed.kind === 'ok') return { doc: parsed.doc, notice: null, restored: true }
   return recover(currentId, raw)
 }
 

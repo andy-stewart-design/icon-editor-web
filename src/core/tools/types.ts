@@ -22,7 +22,7 @@ export type OverlayPrimitive =
   | { kind: 'draft'; shape: PathShape }
   | { kind: 'snapPoint'; p: Pt } // an anchor target was hit
   | { kind: 'snapLine'; axis: 'x' | 'y'; value: number } // a straight target (edge, center or guide) was hit
-  | { kind: 'hover'; shapeId: string } // Select tool: the shape under the pointer, when no gesture is active
+  | { kind: 'hover'; shapeId: string; boardId?: string } // Select tool: the shape under the pointer, when no gesture is active
   | { kind: 'marquee'; rect: Rect } // Select tool: the marquee being dragged, in doc units
   | { kind: 'anchor'; p: Pt; selected?: boolean } // a node, drawn at a constant screen size; Node tool: selected = highlighted
   | { kind: 'handle'; from: Pt; to: Pt } // a node's handle: a line from the anchor and a dot at the handle

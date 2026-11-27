@@ -1,8 +1,9 @@
+import { contentOfFirstBoard, workspaceWithShapes } from '../test-fixtures/artboard-workspace'
 import { describe, expect, it } from 'vitest'
 import { nudgeSelection, selectAll } from '../commands/selection'
 import { selectionBounds } from '../geometry/bounds'
 import { makeLine, makeRect } from '../geometry/shapes'
-import { createDefaultDoc, type IconDoc, type PathShape, type Pt } from '../model'
+import { type IconDoc, type PathShape, type Pt } from '../model'
 import { createEditorStore } from '../store'
 import { createSelectTool, hitTestShape } from './selectTool'
 import type { ToolEvent } from './types'
@@ -27,7 +28,7 @@ function hline(y: number): PathShape {
 }
 
 function docWith(shapes: PathShape[]): IconDoc {
-  return { ...createDefaultDoc(), shapes }
+  return workspaceWithShapes(shapes)
 }
 
 describe('select tool hit testing (AC10)', () => {
@@ -36,8 +37,10 @@ describe('select tool hit testing (AC10)', () => {
     const store = createEditorStore(docWith([line]))
     const tool = createSelectTool(store)
     // zoom 16: tolerance 6/16 = 0.375, plus half the 1.5 stroke = 0.75, so reach is 1.125 doc units.
-    expect(hitTestShape(store.getState().doc, { x: 12, y: 5.1 }, 16)).toBe(line.id)
-    expect(hitTestShape(store.getState().doc, { x: 12, y: 6 }, 16)).toBeNull()
+    expect(hitTestShape(contentOfFirstBoard(store.getState().doc), { x: 12, y: 5.1 }, 16)).toBe(
+      line.id,
+    )
+    expect(hitTestShape(contentOfFirstBoard(store.getState().doc), { x: 12, y: 6 }, 16)).toBeNull()
 
     tool.pointerDown(ev(12, 5.1))
     tool.pointerUp(ev(12, 5.1))
@@ -87,7 +90,10 @@ describe('select tool drag-move (AC37, AC38)', () => {
     tool.pointerMove(ev(16, 6))
     tool.pointerMove(ev(20, 9))
     expect(store.getState().tx).not.toBeNull()
-    expect(store.getState().doc.shapes[0].subpaths[0].nodes[0].p).toEqual({ x: 2 + 8, y: 4 + 5 })
+    expect(store.getState().doc.boards[0].shapes[0].subpaths[0].nodes[0].p).toEqual({
+      x: 2 + 8,
+      y: 4 + 5,
+    })
     tool.pointerUp(ev(20, 9))
     expect(store.getState().tx).toBeNull()
     expect(store.getState().history.past).toHaveLength(1)
@@ -129,7 +135,7 @@ describe('select tool click versus drag', () => {
     tool.pointerDown(ev(8, 4.07))
     tool.pointerMove(ev(9, 4.07))
     tool.pointerUp(ev(9, 4.07))
-    const p = store.getState().doc.shapes[0].subpaths[0].nodes[0].p
+    const p = store.getState().doc.boards[0].shapes[0].subpaths[0].nodes[0].p
     expect(p.x * 2).toBeCloseTo(Math.round(p.x * 2), 9)
     expect(store.getState().history.past).toHaveLength(1)
   })
@@ -140,7 +146,7 @@ describe('nudge and select-all commands (AC12)', () => {
     const line = hline(4)
     const store = createEditorStore(docWith([line]))
     store.setUi({ snapEnabled: false, snapIncrement: 0.5 })
-    const x0 = () => store.getState().doc.shapes[0].subpaths[0].nodes[0].p.x
+    const x0 = () => store.getState().doc.boards[0].shapes[0].subpaths[0].nodes[0].p.x
 
     store.setSelection({ shapeIds: [line.id], nodes: [] })
     store.dispatch(nudgeSelection(store.getState().selection, 'right', 0.5, false))
@@ -152,7 +158,7 @@ describe('nudge and select-all commands (AC12)', () => {
 
   it('select-all selects every shape without a history entry', () => {
     const store = createEditorStore(docWith([hline(2), hline(10)]))
-    store.dispatch(selectAll(store.getState().doc))
+    store.dispatch(selectAll(contentOfFirstBoard(store.getState().doc)))
     expect(store.getState().selection.shapeIds).toHaveLength(2)
     expect(store.getState().history.past).toHaveLength(0)
   })
@@ -171,7 +177,12 @@ describe('select tool handles', () => {
     tool.pointerDown(ev(12, 12)) // the se corner
     tool.pointerMove(ev(20, 20))
     tool.pointerUp(ev(20, 20))
-    expect(selectionBounds([store.getState().doc.shapes[0]])).toEqual({ x: 4, y: 4, w: 16, h: 16 })
+    expect(selectionBounds([store.getState().doc.boards[0].shapes[0]])).toEqual({
+      x: 4,
+      y: 4,
+      w: 16,
+      h: 16,
+    })
     expect(store.getState().history.past).toHaveLength(1)
 
     // Rotate handle: 22 screen px above the top edge at zoom 16, then a quarter turn about the center (12,12).

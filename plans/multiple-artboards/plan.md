@@ -13,8 +13,7 @@ This plan is an execution contract. A checked box records work performed, not ac
 - Freeze scope, steps, IDs, dependencies, expected files, verification definitions, gates, and acceptance mappings during routine execution. Change only task boxes. Escalate material conflicts before affected work; if the user agrees to a plan change, record what changed, why, and the actual agreement in `evidence/changes.md`.
 - Check a verification task only when its checks and completion gate pass and evidence is recorded. Keep skipped, failed, blocked, and waived checks unchecked; record the reason, any known approval owner, and follow-up in the named evidence note. Keep notes to a few bullets or sentences with the check, outcome, and material caveats. No empty notes or plan status fields.
 - The last recorded `pnpm check`, `pnpm lint`, and `pnpm format` passes were during the interview. There is no current test, build, or browser baseline; establish the automated baseline in Phase 0. No known blocker from static review.
-- Existing `pnpm test <paths>` runs Vitest in Node. Browser behavior is a separate manual gate. For those gates, use a disposable browser profile and a fresh `pnpm build` followed by `pnpm preview --host 127.0.0.1 --port 4173 --strictPort`. Use an available isolated port if needed and record the origin. Browser access with DevTools and clipboard or the existing Copy fallback is required. Do not use real user workspaces or a production origin.
-- For a browser fixture, use the preview origin's IndexedDB database `icon-editor` (version 1), object store `kv`; write the raw fixture under `doc:<id>` and its ID under `current`. Wait for the transaction to finish, then load or reload the editor. These are the existing keys, even when the document format changes. No development-only app globals are needed.
+- Existing `pnpm test <paths>` runs Vitest in Node. After Step 1.2, give the user a short checklist for testing through the normal app controls in their usual browser. No browser automation, special profiles, fixture seeding, or DevTools setup. Leave browser-dependent verification unchecked until the user reports results. Step 1.2's completed checks remain historical evidence.
 
 ## Phase overview and delivery boundary
 
@@ -99,12 +98,12 @@ Expected files:
 
 Tasks:
 
-- [ ] Store ordered boards with stable IDs, names, square sizes, finite workspace origins, and owned board-local shape lists. Keep shared stroke defaults on the document and the active board out of the saved schema. Convert valid v1 to one stable board at the origin, preserving document/artwork IDs, style, order, and coordinates. Keep the legacy parser's positive finite size compatibility separate from the stricter resize field, including when a migrated record is later saved and read.
-- [ ] Switch restore and save with their callers. Do not overwrite a valid v1 record merely by opening it; subsequent committed saves use the new schema. Preserve recovery for malformed and future records, backup-key collision handling, and save ordering. Reconcile active board and selection on load, replacement, undo, and redo; route mutation to the owner, except for intentionally shared defaults.
-- [ ] Render all boards and overflow in the same order used for hits, and distinguish the active board. Keep world-to-board projection consistent for tools, overlays, guides, snap, and Fit/0. Route shape picks to the painted shape's owner, new drawing and marquee to the start interior or active board, and pin drawing/attachment to the correct board for the lifetime of the gesture or Pen draft.
-- [ ] Change Copy and the dev helper to pass only the active board's local SVG input. Replace old root `size` and `shapes` reads in existing consumers and tests in the same cut; do not leave writable aliases or lose non-active data in a single-board projection.
-- [ ] Add coverage for v1 exact SVG, valid workspace round-trip, invalid/future data recovery and preserved backups, committed-only saves, valid selection restoration, translated board input, and route/ownership cases. Seed two differently sized nonzero-position boards with overflowing strokes that do not completely hide either board.
-- [ ] Satisfy verification and the completion gate, and record concise evidence.
+- [x] Store ordered boards with stable IDs, names, square sizes, finite workspace origins, and owned board-local shape lists. Keep shared stroke defaults on the document and the active board out of the saved schema. Convert valid v1 to one stable board at the origin, preserving document/artwork IDs, style, order, and coordinates. Keep the legacy parser's positive finite size compatibility separate from the stricter resize field, including when a migrated record is later saved and read.
+- [x] Switch restore and save with their callers. Do not overwrite a valid v1 record merely by opening it; subsequent committed saves use the new schema. Preserve recovery for malformed and future records, backup-key collision handling, and save ordering. Reconcile active board and selection on load, replacement, undo, and redo; route mutation to the owner, except for intentionally shared defaults.
+- [x] Render all boards and overflow in the same order used for hits, and distinguish the active board. Keep world-to-board projection consistent for tools, overlays, guides, snap, and Fit/0. Route shape picks to the painted shape's owner, new drawing and marquee to the start interior or active board, and pin drawing/attachment to the correct board for the lifetime of the gesture or Pen draft.
+- [x] Change Copy and the dev helper to pass only the active board's local SVG input. Replace old root `size` and `shapes` reads in existing consumers and tests in the same cut; do not leave writable aliases or lose non-active data in a single-board projection.
+- [x] Add coverage for v1 exact SVG, valid workspace round-trip, invalid/future data recovery and preserved backups, committed-only saves, valid selection restoration, translated board input, and route/ownership cases. Seed two differently sized nonzero-position boards with overflowing strokes that do not completely hide either board.
+- [x] Satisfy verification and the completion gate, and record concise evidence.
 
 Verification:
 
@@ -143,7 +142,7 @@ Tasks:
 Verification:
 
 - Automated: Run `pnpm test src/core/commands/artboards.test.ts src/core/history.test.ts` and `pnpm check`. Creation and duplication do not change the source SVG, duplicate editing is independent, and deletion and history preserve ownership and a valid active board.
-- Manual: From a populated single board in preview, Add, Duplicate, rename and edit the copy. Delete active, undo and redo; return to one board and attempt deletion. Use **New** and confirm it resets the workspace instead of adding a board.
+- Manual: From a populated single board in the app, Add, Duplicate, rename and edit the copy. Delete active, undo and redo; return to one board and attempt deletion. Use **New** and confirm it resets the workspace instead of adding a board.
 
 Completion gate: AC1 and AC4 can be demonstrated from app controls alone. Evidence: [evidence/step-2.1.md](evidence/step-2.1.md).
 
@@ -168,11 +167,11 @@ Tasks:
 Verification:
 
 - Automated: Run `pnpm test src/core/commands/artboards.test.ts src/core/commands/document-style.test.ts src/core/history.test.ts src/core/validation.test.ts` and `pnpm check`. Verify board origin, local coordinates, unchanged other board, export parity, history and field validation.
-- Manual: In preview, copy a board with visible overflow, drag its label over another board, copy again, then undo/redo the move. Repeat a move while zoomed. Resize in both modes with another board visible; try an out-of-range and fractional value. Observe rendered paths, stroke widths, and active-board guides in each case.
+- Manual: In the app, copy a board with visible overflow, drag its label over another board, copy again, then undo/redo the move. Repeat a move while zoomed. Resize in both modes with another board visible; try an out-of-range and fractional value. Observe rendered paths, stroke widths, and active-board guides in each case.
 
 Completion gate: AC2 and AC3 pass, and moving a board cannot be mistaken for moving or transferring a shape. Evidence: [evidence/step-2.2.md](evidence/step-2.2.md).
 
-Phase exit gate: Run `pnpm check`, `pnpm lint`, `pnpm test src/core/commands src/core/history.test.ts src/core/serialize/index.test.ts`, and `pnpm build`. In preview, create a small set and a size variant, then move, resize, and copy the original and variant independently; a board move must not change either SVG. Record in [step 2.2 evidence](evidence/step-2.2.md).
+Phase exit gate: Run `pnpm check`, `pnpm lint`, `pnpm test src/core/commands src/core/history.test.ts src/core/serialize/index.test.ts`, and `pnpm build`. In the app, create a small set and a size variant, then move, resize, and copy the original and variant independently; a board move must not change either SVG. Record in [step 2.2 evidence](evidence/step-2.2.md).
 
 ## Phase 3 — Transfer artwork and verify the full workflow
 
@@ -202,11 +201,11 @@ Tasks:
 Verification:
 
 - Automated: Run `pnpm test src/core/tools/selectTool.test.ts src/core/tools/nodeTool.test.ts src/core/commands/artboards.test.ts src/core/history.test.ts src/core/persistence.test.ts` and `pnpm check`. The raw pointer decides the result even when geometry overlaps another board, undo/redo restores coordinates and ownership in one step, and cancellation leaves no history or save.
-- Manual: In preview, drag a group with the cursor offset from the center, drop in blank space, then transfer it onto a different board. Repeat at zoom. At an overlap, drag once from the lower board and once from the topmost board so that the topmost target is a different board in one case and the source in the other. Check the cue, unchanged placement at release, continued selection, and one undo/redo. Cancel with Escape and verify no transfer, then move a node across a board edge and verify its board still owns it.
+- Manual: In the app, drag a group with the cursor offset from the center, drop in blank space, then transfer it onto a different board. Repeat at zoom. At an overlap, drag once from the lower board and once from the topmost board so that the topmost target is a different board in one case and the source in the other. Check the cue, unchanged placement at release, continued selection, and one undo/redo. Cancel with Escape and verify no transfer, then move a node across a board edge and verify its board still owns it.
 
 Completion gate: AC6 and AC7 agree between the tool tests and real pointer interaction. Evidence: [evidence/step-3.1.md](evidence/step-3.1.md).
 
-Phase exit gate: Run `pnpm format`, confirm it has not changed unrelated files, then run `pnpm check`, `pnpm lint`, `pnpm test`, and `pnpm build`. In a clean preview profile, run the final browser workflow below and require every acceptance criterion to have its owning proof. Record command outcomes and cross-cutting browser proof in [evidence/final.md](evidence/final.md), not in the plan. Complete this gate before marking the feature ready for delivery review.
+Phase exit gate: Run `pnpm format`, confirm it has not changed unrelated files, then run `pnpm check`, `pnpm lint`, `pnpm test`, and `pnpm build`. Ask the user to run the final browser workflow below in the app. Require every acceptance criterion to have its owning proof. Record command outcomes and cross-cutting browser proof in [evidence/final.md](evidence/final.md), not in the plan. Complete this gate before marking the feature ready for delivery review.
 
 ## Final acceptance
 
@@ -217,12 +216,12 @@ Phase exit gate: Run `pnpm format`, confirm it has not changed unrelated files, 
 | AC3 | 2.2 | Both size modes target only one board; stroke widths and invalid-input behavior are preserved. | [step 2.2](evidence/step-2.2.md) |
 | AC4 | 2.1 | Delete, undo, redo and final-board guard work, and New resets the workspace. | [step 2.1](evidence/step-2.1.md) |
 | AC5 | 1.2 | Real board/shape clicks, drawing, marquee, guides, Fit and Copy use the right active board. | [step 1.2](evidence/step-1.2.md) |
-| AC6 | 3.1 | Blank drop, transfer, continued selection, Escape, and single-step undo/redo agree in core and preview. | [step 3.1](evidence/step-3.1.md) |
+| AC6 | 3.1 | Blank drop, transfer, continued selection, Escape, and single-step undo/redo agree in core and the app. | [step 3.1](evidence/step-3.1.md) |
 | AC7 | 3.1 | Both overlap orders match the cue; node moves do not transfer. | [step 3.1](evidence/step-3.1.md) |
-| AC8 | 1.2, Phase 3 exit | Each Copy has the selected board's dimensions and all and only its owned paths, including overflow. Recheck after transfer in final preview. | [step 1.2](evidence/step-1.2.md), [final](evidence/final.md) |
-| AC9 | Phase 3 exit, supported by 0.1 and 1.2 | Legacy Copy is exact, committed management and transfer survive real reload, and an interrupted drag does not. | [final](evidence/final.md) |
+| AC8 | 1.2, Phase 3 exit | Each Copy has the selected board's dimensions and all and only its owned paths, including overflow. Recheck after transfer in the app. | [step 1.2](evidence/step-1.2.md), [final](evidence/final.md) |
+| AC9 | Phase 3 exit, supported by 0.1 and 1.2 | Use the completed Step 1.2 evidence for exact legacy Copy. Manually verify that committed management and transfer survive reload and an interrupted drag does not. | [step 1.2](evidence/step-1.2.md), [final](evidence/final.md) |
 
-Final browser workflow: Seed the raw v1 fixture and compare Copy against the pinned SVG. Add another board, rename, move and resize the boards, and transfer an overflowing path. Copy both and inspect dimensions and owned paths. Wait for IndexedDB to contain the committed workspace before reloading. Verify names, origins, sizes and ownership are restored, with a valid active board and the same SVGs. With that persisted baseline, begin a new drag and reload before release; the last committed state must still be present. Record browser/fixture and comparisons without including a full transcript. Node checks alone do not establish browser clipboard, pointer capture or IndexedDB behavior.
+Final browser workflow: In the app, add a second board, rename, move and resize the boards, and transfer an overflowing path. Copy both and check the sizes and paths. Give autosave a moment, then reload and check that names, positions, sizes, and artwork survived and Copy still gives the same SVGs. Start another drag and reload before releasing; the last saved layout should still be there. Use the existing legacy verification from Step 1.2 rather than setting up an old document again.
 
 ## Rollback and recovery
 

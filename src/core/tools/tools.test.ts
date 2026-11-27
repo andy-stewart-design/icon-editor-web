@@ -51,7 +51,7 @@ describe('rect tool', () => {
     tool.pointerMove(ev(16, 14, { alt: true, shift: true }))
     expect(draftBox(tool)).toEqual([8, 8, 16, 16])
     tool.pointerUp(ev(16, 14, { alt: true, shift: true }))
-    expect(store.getState().doc.shapes).toHaveLength(1)
+    expect(store.getState().doc.boards[0].shapes).toHaveLength(1)
   })
 })
 
@@ -63,8 +63,8 @@ describe('ellipse tool (AC17)', () => {
     tool.pointerUp(ev(20, 12, { alt: true, shift: true }))
 
     const { doc, history, selection } = store.getState()
-    expect(doc.shapes).toHaveLength(1)
-    const [shape] = doc.shapes
+    expect(doc.boards[0].shapes).toHaveLength(1)
+    const [shape] = doc.boards[0].shapes
     const nodes = shape.subpaths[0].nodes
     expect(shape.subpaths[0].closed).toBe(true)
     expect(nodes.map((n) => n.mode)).toEqual(['smooth', 'smooth', 'smooth', 'smooth'])
@@ -90,7 +90,7 @@ describe('zero-size drags and cancel (AC16)', () => {
       const { store, tool } = setup(make)
       tool.pointerDown(ev(5, 5))
       tool.pointerUp(ev(5, 5))
-      expect(store.getState().doc.shapes).toHaveLength(0)
+      expect(store.getState().doc.boards[0].shapes).toHaveLength(0)
       expect(store.getState().history.past).toHaveLength(0)
 
       tool.pointerDown(ev(5, 5))
@@ -99,7 +99,7 @@ describe('zero-size drags and cancel (AC16)', () => {
       tool.keyDown('Escape')
       expect(tool.overlay()).toEqual([])
       tool.pointerUp(ev(9, 9))
-      expect(store.getState().doc.shapes).toHaveLength(0)
+      expect(store.getState().doc.boards[0].shapes).toHaveLength(0)
       expect(store.getState().history.past).toHaveLength(0)
     }
   })
@@ -121,8 +121,8 @@ describe('Space moves the shape being drawn', () => {
 
     tool.pointerUp(ev(10, 8))
     const { doc, history } = store.getState()
-    expect(doc.shapes).toHaveLength(1)
-    expect(bbox(doc.shapes[0])).toEqual([5, 3, 10, 8])
+    expect(doc.boards[0].shapes).toHaveLength(1)
+    expect(bbox(doc.boards[0].shapes[0])).toEqual([5, 3, 10, 8])
     expect(history.past).toHaveLength(1)
   })
 })
@@ -157,7 +157,7 @@ describe('line tool (R9, AC13)', () => {
     tool.pointerDown(ev(2, 2))
     tool.pointerUp(ev(2 + len * Math.cos(a), 2 + len * Math.sin(a), { shift: true }))
 
-    const [shape] = store.getState().doc.shapes
+    const [shape] = store.getState().doc.boards[0].shapes
     expect(shape.subpaths[0].closed).toBe(false)
     const [p0, p1] = shape.subpaths[0].nodes.map((n) => n.p)
     expect(p0).toEqual({ x: 2, y: 2 })
@@ -187,7 +187,7 @@ describe('editor tool contexts', () => {
       tool.pointerDown(ev(12, 4))
       tool.pointerUp(ev(12, 4))
       tool.keyDown('Enter')
-      expect(store.getState().doc.shapes).toHaveLength(1)
+      expect(store.getState().doc.boards[0].shapes).toHaveLength(1)
     },
   )
 
@@ -195,7 +195,7 @@ describe('editor tool contexts', () => {
     const { store, tool } = setup((host) => createLineTool(host))
     tool.pointerDown(ev(4, 4))
     tool.pointerUp(ev(12, 4))
-    const [shape] = store.getState().doc.shapes
+    const [shape] = store.getState().doc.boards[0].shapes
     store.setSelection({ shapeIds: [shape.id], nodes: [] })
     const route = () => toolContext(store.getState().ui)
     store.setUi({ mode: 'node' })

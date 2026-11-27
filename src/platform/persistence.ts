@@ -2,7 +2,6 @@ import {
   createAutosave,
   createDefaultDoc,
   createEditorStore,
-  docKey,
   loadDocument,
   saveDocument,
   type EditorStore,
@@ -33,11 +32,11 @@ export function lazyIdbStore(): KeyValueStore {
 export async function loadSession(): Promise<Session> {
   try {
     const kv = await openIdbStore()
-    const { doc, notice } = await loadDocument(kv, () => Date.now())
+    const { doc, notice, restored } = await loadDocument(kv, () => Date.now())
     let saveStatus: SaveStatus = 'ok'
-    // No stored record for this id means a new or recovery doc: write it now so a record exists after load.
+    // Write only new or recovery workspaces. A successful restore never rewrites legacy data.
     try {
-      if ((await kv.get(docKey(doc.id))) === undefined) await saveDocument(kv, doc)
+      if (!restored) await saveDocument(kv, doc)
     } catch {
       saveStatus = 'failing'
     }

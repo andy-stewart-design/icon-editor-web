@@ -8,10 +8,10 @@ import {
   type HistoryEntry,
   type Selection,
 } from './history'
-import type { IconDoc } from './model'
+import { artboardFor, type Artboard, type IconDoc } from './model'
 import type { EditorState } from './store'
 
-export type Recipe = (draft: IconDoc) => void
+export type Recipe = (board: Artboard, draft: IconDoc) => void
 export type Command = { label: string; recipe: Recipe; selectionAfter?: Selection }
 
 type StateApi = {
@@ -25,7 +25,7 @@ type StateApi = {
 export function createCommands(
   api: StateApi,
   notify: (doc: IconDoc) => void,
-  selectionFor: (sel: Selection, doc: IconDoc) => Selection,
+  selectionFor: (sel: Selection, doc: IconDoc, boardId: string) => Selection,
 ) {
   // Records one entry and notifies, unless the recipe left the doc reference unchanged.
   const record = (entry: HistoryEntry): void => {
@@ -36,6 +36,7 @@ export function createCommands(
     }
     api.setState({
       doc: entry.after,
+      activeBoardId: artboardFor(entry.after, entry.boardId).id,
       selection: entry.selectionAfter,
       history: recordEntry(history, entry),
     })
@@ -43,12 +44,19 @@ export function createCommands(
   }
 
   const dispatch = (command: Command): void => {
-    const { doc, selection, tx } = api.getState()
+    const { doc, selection, tx, activeBoardId } = api.getState()
     if (tx) throw new Error(`dispatch("${command.label}") during open transaction "${tx.label}"`)
-    const after = produce(doc, command.recipe)
+    const after = produce(doc, (draft) => command.recipe(artboardFor(draft, activeBoardId), draft))
     const selectionBefore = selection
-    const selectionAfter = selectionFor(command.selectionAfter ?? selection, after)
-    record({ label: command.label, before: doc, after, selectionBefore, selectionAfter })
+    const selectionAfter = selectionFor(command.selectionAfter ?? selection, after, activeBoardId)
+    record({
+      boardId: activeBoardId,
+      label: command.label,
+      before: doc,
+      after,
+      selectionBefore,
+      selectionAfter,
+    })
   }
 
   const cancel = (): void => {
@@ -58,15 +66,17 @@ export function createCommands(
   }
 
   const begin = (label: string): void => {
-    const { doc, selection, tx } = api.getState()
+    const { doc, selection, tx, activeBoardId } = api.getState()
     if (tx) throw new Error(`begin("${label}") while transaction "${tx.label}" is open`)
-    api.setState({ tx: { label, base: doc, selectionBefore: selection } })
+    api.setState({ tx: { boardId: activeBoardId, label, base: doc, selectionBefore: selection } })
   }
 
   const update = (recipe: Recipe): void => {
     const { tx } = api.getState()
     if (!tx) throw new Error('update() without an open transaction')
-    api.setState({ doc: produce(tx.base, recipe) })
+    api.setState({
+      doc: produce(tx.base, (draft) => recipe(artboardFor(draft, tx.boardId), draft)),
+    })
   }
 
   const commit = (selectionAfter?: Selection): void => {
@@ -74,17 +84,24 @@ export function createCommands(
     if (!tx) return
     api.setState({ tx: null })
     record({
+      boardId: tx.boardId,
       label: tx.label,
       before: tx.base,
       after: doc,
       selectionBefore: tx.selectionBefore,
-      selectionAfter: selectionFor(selectionAfter ?? selection, doc),
+      selectionAfter: selectionFor(selectionAfter ?? selection, doc, tx.boardId),
     })
   }
 
   // Swaps the whole document (New document). Drops any open transaction, history and selection.
   const replaceDocument = (doc: IconDoc): void => {
-    api.setState({ doc, tx: null, history: emptyHistory, selection: emptySelection })
+    api.setState({
+      doc,
+      activeBoardId: doc.boards[0].id,
+      tx: null,
+      history: emptyHistory,
+      selection: emptySelection,
+    })
     notify(doc)
   }
 
@@ -95,7 +112,8 @@ export function createCommands(
     const { entry } = step
     api.setState({
       doc: entry.before,
-      selection: selectionFor(entry.selectionBefore, entry.before),
+      activeBoardId: artboardFor(entry.before, entry.boardId).id,
+      selection: selectionFor(entry.selectionBefore, entry.before, entry.boardId),
       history: step.history,
     })
     notify(entry.before)
@@ -109,7 +127,8 @@ export function createCommands(
     const { entry } = step
     api.setState({
       doc: entry.after,
-      selection: selectionFor(entry.selectionAfter, entry.after),
+      activeBoardId: artboardFor(entry.after, entry.boardId).id,
+      selection: selectionFor(entry.selectionAfter, entry.after, entry.boardId),
       history: step.history,
     })
     notify(entry.after)

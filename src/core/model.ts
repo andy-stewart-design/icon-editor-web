@@ -5,7 +5,7 @@ export type NodeMode = 'corner' | 'smooth' | 'symmetric'
 
 export type PathNode = {
   id: string
-  p: Pt // anchor, absolute document coordinates
+  p: Pt // anchor, board-local coordinates
   hIn?: Pt // incoming handle, absolute; absent = at anchor
   hOut?: Pt // outgoing handle, absolute; absent = at anchor
   mode: NodeMode
@@ -27,17 +27,26 @@ export type Style = {
 export type PathShape = { id: string; type: 'path'; subpaths: Subpath[]; style: Style }
 export type Shape = PathShape // union kept for future widening
 
-export type IconDoc = {
+export type StrokeDefaults = { strokeWidth: number; linecap: Linecap; linejoin: Linejoin }
+export type BoardContent = StrokeDefaults & { size: number; shapes: Shape[] }
+export type Artboard = Pick<BoardContent, 'size' | 'shapes'> & {
   id: string
-  version: 1
-  size: number // artboard is size × size, default 24
-  strokeWidth: number // default 1.5
-  linecap: Linecap
-  linejoin: Linejoin
-  shapes: Shape[] // z-order, bottom to top
+  name: string
+  origin: Pt
+}
+export type IconDoc = StrokeDefaults & { id: string; version: 2; boards: [Artboard, ...Artboard[]] }
+export type LegacyIconDoc = BoardContent & { id: string; version: 1 }
+
+export const CURRENT_VERSION = 2
+
+export function artboardFor(doc: IconDoc, id?: string): Artboard {
+  return doc.boards.find((board) => board.id === id) ?? doc.boards[0]
 }
 
-export const CURRENT_VERSION = 1
+export function boardContent(doc: StrokeDefaults, { size, shapes }: Artboard): BoardContent {
+  const { strokeWidth, linecap, linejoin } = doc
+  return { size, shapes, strokeWidth, linecap, linejoin }
+}
 
 export type ParseResult =
   | { kind: 'ok'; doc: IconDoc }
@@ -45,14 +54,16 @@ export type ParseResult =
   | { kind: 'newerVersion'; version: number }
 
 export function createDefaultDoc(): IconDoc {
+  const id = newId()
   return {
-    id: newId(),
+    id,
     version: CURRENT_VERSION,
-    size: 24,
+    boards: [
+      { id: `${id}:board`, name: 'Artboard 1', origin: { x: 0, y: 0 }, size: 24, shapes: [] },
+    ],
     strokeWidth: 1.5,
     linecap: 'round',
     linejoin: 'round',
-    shapes: [],
   }
 }
 
@@ -100,26 +111,21 @@ function checkShape(v: unknown, where: string): void {
   check(isObj(v) && isId(v.id), `${where}: expected shape with non-empty id`)
   check(v.type === 'path', `${where}.type: expected 'path'`)
   check(Array.isArray(v.subpaths), `${where}.subpaths: expected array`)
-  v.subpaths.forEach((sp: unknown, i) => {
+  for (const [i, sp] of v.subpaths.entries()) {
     const w = `${where}.subpaths[${i}]`
     check(isObj(sp) && isId(sp.id), `${w}: expected subpath with non-empty id`)
     check(Array.isArray(sp.nodes), `${w}.nodes: expected array`)
-    sp.nodes.forEach((n: unknown, j: number) => checkNode(n, `${w}.nodes[${j}]`))
+    for (const [j, n] of sp.nodes.entries()) checkNode(n, `${w}.nodes[${j}]`)
     check(typeof sp.closed === 'boolean', `${w}.closed: expected boolean`)
-  })
+  }
   checkStyle(v.style, `${where}.style`)
 }
 
-function checkDoc(v: unknown): void {
-  check(isObj(v), 'expected object')
-  check(isId(v.id), 'id: expected non-empty string')
-  check(v.version === CURRENT_VERSION, 'version: expected 1')
-  check(isPosNum(v.size), 'size: expected positive number')
-  check(isPosNum(v.strokeWidth), 'strokeWidth: expected positive number')
-  check(isLinecap(v.linecap), 'linecap: invalid value')
-  check(isLinejoin(v.linejoin), 'linejoin: invalid value')
-  check(Array.isArray(v.shapes), 'shapes: expected array')
-  v.shapes.forEach((s: unknown, i: number) => checkShape(s, `shapes[${i}]`))
+function checkContent(v: Record<string, unknown>, where: string): void {
+  // Stored sizes retain v1's positive finite range; the resize field is deliberately stricter.
+  check(isPosNum(v.size), `${where}.size: expected positive number`)
+  check(Array.isArray(v.shapes), `${where}.shapes: expected array`)
+  for (const [i, shape] of v.shapes.entries()) checkShape(shape, `${where}.shapes[${i}]`)
 }
 
 export function parseIconDoc(input: unknown): ParseResult {
@@ -127,8 +133,48 @@ export function parseIconDoc(input: unknown): ParseResult {
     return { kind: 'newerVersion', version: input.version }
   }
   try {
-    checkDoc(input)
-    return { kind: 'ok', doc: input as IconDoc }
+    check(isObj(input), 'expected object')
+    const { id, version, strokeWidth, linecap, linejoin } = input
+    check(isId(id), 'id: expected non-empty string')
+    check(isPosNum(strokeWidth), 'strokeWidth: expected positive number')
+    check(isLinecap(linecap), 'linecap: invalid value')
+    check(isLinejoin(linejoin), 'linejoin: invalid value')
+    if (version === 1) {
+      checkContent(input, 'document')
+      const { size, shapes } = input as LegacyIconDoc
+      return {
+        kind: 'ok',
+        doc: {
+          id,
+          version: CURRENT_VERSION,
+          strokeWidth,
+          linecap,
+          linejoin,
+          boards: [{ id: `${id}:board`, name: 'Artboard 1', origin: { x: 0, y: 0 }, size, shapes }],
+        },
+      }
+    }
+    check(version === CURRENT_VERSION, 'unsupported version')
+    check(Array.isArray(input.boards) && input.boards.length > 0, 'boards: expected nonempty array')
+    const ids = new Set<string>()
+    const shapeOwners = new Map<string, string>()
+    for (const board of input.boards as unknown[]) {
+      check(
+        isObj(board) && isId(board.id) && !ids.has(board.id),
+        'boards: expected unique board id',
+      )
+      ids.add(board.id)
+      check(typeof board.name === 'string', 'board.name: expected string')
+      checkPt(board.origin, 'board.origin')
+      checkContent(board, 'board')
+      for (const shape of (board as Artboard).shapes) {
+        const owner = shapeOwners.get(shape.id)
+        check(owner === undefined || owner === board.id, 'shape id belongs to multiple boards')
+        shapeOwners.set(shape.id, board.id)
+      }
+    }
+    const { boards } = input as IconDoc
+    return { kind: 'ok', doc: { id, version, boards, strokeWidth, linecap, linejoin } }
   } catch (e) {
     if (e instanceof InvalidDoc) return { kind: 'invalid', reason: e.message }
     throw e

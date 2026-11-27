@@ -5,15 +5,15 @@ import {
   rotateHandlePoint,
   selectionBounds,
 } from '../../../core'
-import { useEditor } from '../../../hooks/use-editor'
+import { useEditor, useActiveContent, useBoardViewport } from '../../../hooks/use-editor'
 import s from './styles.module.css'
 
 // Bounds of the selected shapes with eight resize handles and a rotate handle, drawn in screen pixels so everything
 // keeps a constant size at any zoom. Never serialized. Dragging is handled by the select tool, not here.
 export default function SelectionOverlay() {
-  const doc = useEditor((e) => e.doc)
+  const doc = useActiveContent()
   const ids = useEditor((e) => e.selection.shapeIds)
-  const vp = useEditor((e) => e.ui.viewport)
+  const vp = useBoardViewport()
   const tool = useEditor((e) => e.ui.activeTool)
   const mode = useEditor((e) => e.ui.mode)
   const showHandles = tool === 'select'

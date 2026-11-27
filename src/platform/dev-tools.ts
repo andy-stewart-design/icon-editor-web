@@ -1,4 +1,5 @@
 import {
+  activeContent,
   serializeSvg,
   type EditorStore,
   type IconDoc,
@@ -84,7 +85,7 @@ export function installDevTools(store: EditorStore): void {
   window.iconEditor = {
     store,
     doc: () => store.getState().doc,
-    svg: () => serializeSvg(store.getState().doc),
+    svg: () => serializeSvg(activeContent(store.getState())),
     loadFixture: () =>
       store.dispatch({
         label: 'Load fixture',

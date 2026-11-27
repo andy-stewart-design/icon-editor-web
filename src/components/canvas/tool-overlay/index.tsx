@@ -1,11 +1,12 @@
 import {
   docToScreen,
+  artboardFor,
   shapeAttributes,
-  type IconDoc,
+  type StrokeDefaults,
   type OverlayPrimitive,
   type PathShape,
 } from '../../../core'
-import { useEditor } from '../../../hooks/use-editor'
+import { useEditor, useActiveContent, useBoardViewport } from '../../../hooks/use-editor'
 import s from './styles.module.css'
 
 const SNAP_RING_RADIUS = 4 // screen px
@@ -16,7 +17,7 @@ const CLOSE_RING_RADIUS = 7 // screen px
 const HOVER_RING_HALF = 6 // half the side of the node hover ring, screen px
 
 // Draft markup matches the content layer: the document's stroke width, caps and joins apply unless the shape overrides them.
-function DraftPath({ shape, doc }: { shape: PathShape; doc: IconDoc }) {
+function DraftPath({ shape, doc }: { shape: PathShape; doc: StrokeDefaults }) {
   const d = shapeAttributes(shape).find(([k]) => k === 'd')?.[1] ?? ''
   return (
     <path
@@ -30,7 +31,7 @@ function DraftPath({ shape, doc }: { shape: PathShape; doc: IconDoc }) {
 }
 
 // Hover halo: the shape's own outline, drawn wider in document units so it extends a fixed few screen px beyond the stroke.
-function HoverPath({ shape, doc, zoom }: { shape: PathShape; doc: IconDoc; zoom: number }) {
+function HoverPath({ shape, doc, zoom }: { shape: PathShape; doc: StrokeDefaults; zoom: number }) {
   const d = shapeAttributes(shape).find(([k]) => k === 'd')?.[1] ?? ''
   return (
     <path
@@ -47,8 +48,10 @@ function HoverPath({ shape, doc, zoom }: { shape: PathShape; doc: IconDoc; zoom:
 // and positions come from the viewport. Draft geometry lives in a zoomed group (document units), while snap
 // markers are placed in screen pixels so they keep a constant size at any zoom.
 export default function ToolOverlay({ primitives }: { primitives: OverlayPrimitive[] }) {
-  const doc = useEditor((e) => e.doc)
-  const vp = useEditor((e) => e.ui.viewport)
+  const doc = useActiveContent()
+  const vp = useBoardViewport()
+  const workspace = useEditor((state) => state.doc)
+  const workspaceVp = useEditor((state) => state.ui.viewport)
   if (primitives.length === 0) return null
 
   const origin = docToScreen(vp, { x: 0, y: 0 })
@@ -119,10 +122,12 @@ export default function ToolOverlay({ primitives }: { primitives: OverlayPrimiti
           return <line key={i} className={s.snapLine} x1={origin.x} y1={y} x2={far.x} y2={y} />
         }
         if (p.kind === 'hover') {
-          const shape = doc.shapes.find((sh) => sh.id === p.shapeId)
+          const board = p.boardId ? artboardFor(workspace, p.boardId) : undefined
+          const at = board ? docToScreen(workspaceVp, board.origin) : origin
+          const shape = (board ?? doc).shapes.find((sh) => sh.id === p.shapeId)
           if (!shape) return null
           return (
-            <g key={i} transform={`translate(${origin.x} ${origin.y}) scale(${vp.zoom})`}>
+            <g key={i} transform={`translate(${at.x} ${at.y}) scale(${vp.zoom})`}>
               <HoverPath shape={shape} doc={doc} zoom={vp.zoom} />
             </g>
           )

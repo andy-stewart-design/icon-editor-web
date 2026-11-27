@@ -1,5 +1,12 @@
+import {
+  artboardWorkspace,
+  contentOfFirstBoard,
+  workspaceWithShapes,
+} from '../core/test-fixtures/artboard-workspace'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  activeViewport,
+  docToScreen,
   createDefaultDoc,
   createEditorStore,
   screenToDoc,
@@ -37,6 +44,19 @@ function setup(doc = createDefaultDoc()) {
 }
 
 describe('canvas zoom shortcuts', () => {
+  it('centers Fit and actual size on the translated active board', () => {
+    const { store, press } = setup(artboardWorkspace)
+    const board = artboardWorkspace.boards[1]
+    store.activateBoard(board.id)
+    expect(press('0', {})).toBe(true)
+    const center = { x: board.size / 2, y: board.size / 2 }
+    expect(docToScreen(activeViewport(store.getState()), center)).toEqual({ x: 300, y: 200 })
+    expect(store.getState().ui.viewport.zoom).toBe(9.5)
+    expect(press('1', {})).toBe(true)
+    expect(docToScreen(activeViewport(store.getState()), center)).toEqual({ x: 300, y: 200 })
+    expect(store.getState().ui.viewport.zoom).toBe(1)
+  })
+
   it.each([
     ['+', { metaKey: true, shiftKey: true }],
     ['+', { ctrlKey: true, code: 'NumpadAdd' }],
@@ -72,7 +92,7 @@ describe('canvas zoom shortcuts', () => {
 function setupNudge(mode: 'shape' | 'node') {
   const line = makeLine({ x: 2, y: 4 }, { x: 12, y: 4 })
   if (!line) throw new Error('degenerate line')
-  const { store, press } = setup({ ...createDefaultDoc(), shapes: [line] })
+  const { store, press } = setup(workspaceWithShapes([line]))
   const subpath = line.subpaths[0]
   store.setUi({ activeTool: 'select', mode, snapEnabled: false })
   store.setSelection({
@@ -82,7 +102,8 @@ function setupNudge(mode: 'shape' | 'node') {
         ? [{ shapeId: line.id, subpathId: subpath.id, nodeId: subpath.nodes[0].id }]
         : [],
   })
-  const xs = () => store.getState().doc.shapes[0].subpaths[0].nodes.map((node) => node.p.x)
+  const xs = () =>
+    store.getState().doc.boards[0].shapes[0].subpaths[0].nodes.map((node) => node.p.x)
   return { store, press, xs }
 }
 
@@ -154,7 +175,7 @@ describe('local clipboard shortcuts', () => {
   it('copies snapshots in stacking order, cuts and pastes with independent history and fresh IDs', () => {
     const a = path('a', [1, 2, 3], true)
     const b = path('b', [4, 5])
-    const doc = { ...createDefaultDoc(), shapes: [a, b] }
+    const doc = workspaceWithShapes([a, b])
     const { store, press } = setup(doc)
     const before = { shapeIds: ['b', 'a'], nodes: [] }
     store.setSelection(before)
@@ -164,7 +185,7 @@ describe('local clipboard shortcuts', () => {
       draft.shapes[0].style.strokeWidth = 9
     })
     press('v', cmd)
-    const pasted = store.getState().doc.shapes.slice(2)
+    const pasted = store.getState().doc.boards[0].shapes.slice(2)
     expect(pasted.map((s) => s.style)).toEqual([a.style, b.style])
     const bounds = selectionBounds([a, b])!
     const dx = 62.5 - (bounds.x + bounds.w / 2)
@@ -195,7 +216,7 @@ describe('local clipboard shortcuts', () => {
     store.redo()
     expect(store.getState().selection).toEqual(after)
     press('x', cmd)
-    expect(store.getState().doc.shapes).toHaveLength(2)
+    expect(store.getState().doc.boards[0].shapes).toHaveLength(2)
     expect(store.getState().selection.shapeIds).toEqual([])
     press('v', cmd)
     expect(store.getState().selection.shapeIds).not.toEqual(after.shapeIds)
@@ -208,7 +229,7 @@ describe('local clipboard shortcuts', () => {
     const source = path('source', [0, 4, 8], true)
     source.subpaths.push({ ...path('extra', [0, 4]).subpaths[0] })
     const target = { ...path('target', [24, 30]), style: { strokeWidth: 8 } }
-    const original = { ...createDefaultDoc(), shapes: [source, target] }
+    const original = workspaceWithShapes([source, target])
     const { store, viewport, press } = setup(original)
     const select = createSelectTool(store)
     const click = (x: number) => {
@@ -236,8 +257,8 @@ describe('local clipboard shortcuts', () => {
     press('v', cmd)
 
     const { doc, history } = store.getState()
-    expect(doc.shapes.map((shape) => shape.id)).toEqual([source.id, target.id])
-    const pasted = doc.shapes[1]
+    expect(doc.boards[0].shapes.map((shape) => shape.id)).toEqual([source.id, target.id])
+    const pasted = doc.boards[0].shapes[1]
     expect(pasted.style).toEqual(target.style)
     expect(pasted.subpaths[0]).toEqual(target.subpaths[0])
     const appended = pasted.subpaths.slice(1)
@@ -245,14 +266,14 @@ describe('local clipboard shortcuts', () => {
       [true, 3],
       [false, 2],
     ])
-    const ids = doc.shapes.flatMap((shape) =>
+    const ids = doc.boards[0].shapes.flatMap((shape) =>
       shape.subpaths.flatMap((sp) => [sp.id, ...sp.nodes.map((node) => node.id)]),
     )
     expect(new Set(ids).size).toBe(ids.length)
     const bounds = selectionBounds([{ ...pasted, subpaths: appended }])!
     expect(bounds.x + bounds.w / 2).toBeCloseTo(62.5)
     expect(bounds.y + bounds.h / 2).toBeCloseTo(56.25)
-    const paths = [...serializeBody(doc).matchAll(/<path d="([^"]+)"/g)]
+    const paths = [...serializeBody(contentOfFirstBoard(doc)).matchAll(/<path d="([^"]+)"/g)]
     expect(paths).toHaveLength(2)
     expect(paths[1][1].match(/M/g)).toHaveLength(3)
     expect(history.past).toHaveLength(1)
@@ -264,7 +285,7 @@ describe('local clipboard shortcuts', () => {
   it('keeps the closed seam together, preserves whole contours, and never bridges gaps', () => {
     const a = path('a', [0, 1, 2, 3, 4, 5, 6, 7], true)
     const b = path('b', [8, 9, 10], true)
-    const { store, press } = setup({ ...createDefaultDoc(), shapes: [a, b] })
+    const { store, press } = setup(workspaceWithShapes([a, b]))
     store.setUi({ mode: 'node' })
     store.setSelection({
       shapeIds: ['b', 'a'],
@@ -282,7 +303,7 @@ describe('local clipboard shortcuts', () => {
     store.setUi({ mode: 'shape', activeTool: 'pen' })
     press('v', cmd)
     const { doc, selection, ui } = store.getState()
-    const [pa, pb] = doc.shapes.slice(2)
+    const [pa, pb] = doc.boards[0].shapes.slice(2)
     expect(pa.style).toEqual(a.style)
     const startX = pa.subpaths[0].nodes[0].p.x
     expect(pa.subpaths.map((sp) => sp.nodes.map((n) => n.p.x))).toEqual([
@@ -309,7 +330,7 @@ describe('local clipboard shortcuts', () => {
       const a = path('a', [0, 1, 2], true)
       const b = path('b', [3, 4])
       const dest = { ...path('dest', [8, 9]), style: { ...a.style, strokeWidth: 8 } }
-      const { store, press } = setup({ ...createDefaultDoc(), shapes: [a, b, dest] })
+      const { store, press } = setup(workspaceWithShapes([a, b, dest]))
       store.setUi({ mode: 'node' })
       store.setSelection({
         shapeIds: ['a', 'b'],
@@ -347,10 +368,10 @@ describe('local clipboard shortcuts', () => {
       press('v', cmd)
       const { doc, selection, history } = store.getState()
       const standalone = target === 'fallback'
-      expect(doc.shapes).toHaveLength(standalone ? 5 : 3)
-      expect(doc.shapes[2].style).toEqual(dest.style)
-      expect(doc.shapes[2].subpaths[0]).toEqual(dest.subpaths[0])
-      const owners = standalone ? doc.shapes.slice(3) : [doc.shapes[2]]
+      expect(doc.boards[0].shapes).toHaveLength(standalone ? 5 : 3)
+      expect(doc.boards[0].shapes[2].style).toEqual(dest.style)
+      expect(doc.boards[0].shapes[2].subpaths[0]).toEqual(dest.subpaths[0])
+      const owners = standalone ? doc.boards[0].shapes.slice(3) : [doc.boards[0].shapes[2]]
       const contours = standalone
         ? owners.flatMap((shape) => shape.subpaths)
         : owners[0].subpaths.slice(1)
@@ -358,11 +379,11 @@ describe('local clipboard shortcuts', () => {
         [true, 3],
         [false, 2],
       ])
-      const ids = (shapes: typeof doc.shapes) =>
+      const ids = (shapes: (typeof doc.boards)[0]['shapes']) =>
         shapes.flatMap((shape) =>
           shape.subpaths.flatMap((sp) => [sp.id, ...sp.nodes.map((node) => node.id)]),
         )
-      const allIds = ids(doc.shapes)
+      const allIds = ids(doc.boards[0].shapes)
       expect(new Set(allIds).size).toBe(allIds.length)
       expect(selection.shapeIds).toEqual(owners.map(({ id }) => id))
       expect(selection.nodes).toEqual(
@@ -390,13 +411,13 @@ describe('local clipboard shortcuts', () => {
 
   it('joins cuts and pastes mixed runs atomically, preserving all loose points in path order', () => {
     const a = path('a', [0, 1, 2, 3, 4, 5, 6, 7])
-    const { store, press } = setup({ ...createDefaultDoc(), shapes: [a] })
+    const { store, press } = setup(workspaceWithShapes([a]))
     store.setUi({ mode: 'node' })
     const before = { shapeIds: ['a'], nodes: [ref('a', 6), ref('a', 4), ref('a', 3), ref('a', 1)] }
     store.setSelection(before)
     press('x', cmd)
     const cut = store.getState()
-    expect(cut.doc.shapes[0].subpaths[0].nodes.map((n) => n.p.x)).toEqual([0, 2, 5, 7])
+    expect(cut.doc.boards[0].shapes[0].subpaths[0].nodes.map((n) => n.p.x)).toEqual([0, 2, 5, 7])
     press('v', cmd)
     expect(store.getState()).toBe(cut)
     store.setSelection({ shapeIds: ['a'], nodes: [ref('a', 0), ref('a', 2)] })
@@ -407,7 +428,7 @@ describe('local clipboard shortcuts', () => {
     store.setSelection(destination)
     press('v', cmd)
     const { doc, selection, history } = store.getState()
-    const nodes = doc.shapes[0].subpaths[0].nodes
+    const nodes = doc.boards[0].shapes[0].subpaths[0].nodes
     expect(nodes.map((n) => n.p.x)).toEqual([0, 2, 60, 65, 5, 7])
     expect(nodes[2]).toMatchObject({
       mode: 'smooth',
@@ -416,8 +437,8 @@ describe('local clipboard shortcuts', () => {
       hOut: { x: 61, y: 56.25 },
     })
     expect(nodes[2].id).not.toBe('a-1')
-    expect(doc.shapes).toHaveLength(1)
-    expect(doc.shapes[0].subpaths[1].nodes.map((n) => n.p.x)).toEqual([62, 63])
+    expect(doc.boards[0].shapes).toHaveLength(1)
+    expect(doc.boards[0].shapes[0].subpaths[1].nodes.map((n) => n.p.x)).toEqual([62, 63])
     expect(selection.nodes).toHaveLength(4)
     expect(selection.shapeIds).toEqual(['a'])
     expect(history.past).toHaveLength(2)
@@ -434,7 +455,7 @@ describe('local clipboard shortcuts', () => {
 
   it('centers a lone point after the chosen anchor on every paste using the latest viewport', () => {
     const a = path('a', [0, 1, 2])
-    const { store, press } = setup({ ...createDefaultDoc(), shapes: [a] })
+    const { store, press } = setup(workspaceWithShapes([a]))
     store.setUi({ mode: 'node' })
     store.setSelection({ shapeIds: ['a'], nodes: [ref('a', 0)] })
     press('c', cmd)
@@ -447,7 +468,7 @@ describe('local clipboard shortcuts', () => {
     })
     store.setSelection(destination)
     press('v', cmd)
-    const nodes = store.getState().doc.shapes[0].subpaths[0].nodes
+    const nodes = store.getState().doc.boards[0].shapes[0].subpaths[0].nodes
     expect(nodes.map((n) => n.p)).toEqual([
       { x: 0, y: 5 },
       { x: 1, y: 5 },
@@ -461,7 +482,7 @@ describe('local clipboard shortcuts', () => {
   it('does not overwrite a valid clipboard on a last-node cut, stale ref, or segment selection', () => {
     const a = path('a', [0, 1])
     const other = path('other', [2, 3])
-    const { store, press } = setup({ ...createDefaultDoc(), shapes: [a, other] })
+    const { store, press } = setup(workspaceWithShapes([a, other]))
     store.setSelection({ shapeIds: ['other'], nodes: [] })
     press('c', cmd)
     store.setUi({ mode: 'node' })
@@ -483,14 +504,14 @@ describe('local clipboard shortcuts', () => {
     expect(store.canUndo()).toBe(false)
     press('v', cmd)
     const { doc, selection } = store.getState()
-    expect(doc.shapes).toHaveLength(2)
-    expect(doc.shapes[0].subpaths[1].nodes.map((n) => n.p.x)).toEqual([62, 63])
+    expect(doc.boards[0].shapes).toHaveLength(2)
+    expect(doc.boards[0].shapes[0].subpaths[1].nodes.map((n) => n.p.x)).toEqual([62, 63])
     expect(selection.segment).toBeUndefined()
   })
 
   it('ignores repeats and open gestures, leaves native fields alone, and isolates editors', () => {
     const a = path('a', [0, 1])
-    const { store, press } = setup({ ...createDefaultDoc(), shapes: [a] })
+    const { store, press } = setup(workspaceWithShapes([a]))
     store.setSelection({ shapeIds: ['a'], nodes: [] })
     for (const key of ['c', 'x', 'v']) {
       expect(press(key, cmd, new ElementStub())).toBe(false)
@@ -511,6 +532,6 @@ describe('local clipboard shortcuts', () => {
     expect(store.canUndo()).toBe(false)
     const second = setup()
     second.press('v', cmd)
-    expect(second.store.getState().doc.shapes).toEqual([])
+    expect(second.store.getState().doc.boards[0].shapes).toEqual([])
   })
 })

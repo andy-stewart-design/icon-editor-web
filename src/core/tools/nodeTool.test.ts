@@ -1,9 +1,10 @@
+import { contentOfFirstBoard, workspaceWithShapes } from '../test-fixtures/artboard-workspace'
 import { describe, expect, it } from 'vitest'
 import { deleteSelectedNodes, translateNodes } from '../commands/nodes'
 import { evalSegment, segmentsOf } from '../geometry/segments'
 import { newId } from '../ids'
 import type { NodeRef, Selection } from '../history'
-import { createDefaultDoc, type IconDoc, type PathNode, type PathShape, type Pt } from '../model'
+import { type IconDoc, type PathNode, type PathShape, type Pt } from '../model'
 import { createEditorStore } from '../store'
 import { createNodeTool, hitNode, nodeOverlay, selectionOutline } from './nodeTool'
 import type { ToolEvent } from './types'
@@ -38,7 +39,7 @@ const refOf = (s: PathShape, node: PathNode): NodeRef => ({
   subpathId: s.subpaths[0].id,
   nodeId: node.id,
 })
-const docWith = (shapes: PathShape[]): IconDoc => ({ ...createDefaultDoc(), shapes })
+const docWith = (shapes: PathShape[]): IconDoc => workspaceWithShapes(shapes)
 
 // Editor with snapping off, so pointer positions are exact, and a node tool on top of it.
 function setup(shapes: PathShape[], sel: Selection) {
@@ -52,7 +53,7 @@ function setup(shapes: PathShape[], sel: Selection) {
 const nodeOf = (store: ReturnType<typeof createEditorStore>, s: PathShape, id: string) =>
   store
     .getState()
-    .doc.shapes.find((x) => x.id === s.id)!
+    .doc.boards[0].shapes.find((x) => x.id === s.id)!
     .subpaths[0].nodes.find((x) => x.id === id)!
 
 // Open cubic from (2, 20) to (22, 20) with both handles pulling up to y = 4.
@@ -88,19 +89,21 @@ describe('node tool: segment selection and insertion', () => {
     })
     tool.hover(ev(25, 25))
     expect(
-      nodeOverlay(picked.doc, picked.selection).some((p) => p.kind === 'segmentSelected'),
+      nodeOverlay(contentOfFirstBoard(picked.doc), picked.selection).some(
+        (p) => p.kind === 'segmentSelected',
+      ),
     ).toBe(true)
     tool.doubleClick(ev(mid.x, mid.y))
 
     const after = store.getState()
     expect(store.getState().history.past).toHaveLength(1)
-    const nodes = after.doc.shapes[0].subpaths[0].nodes
+    const nodes = after.doc.boards[0].shapes[0].subpaths[0].nodes
     expect(nodes).toHaveLength(3)
     expect(after.selection.nodes).toHaveLength(1)
     expect(after.selection.nodes[0].nodeId).toBe(nodes[1].id)
 
     // Every sampled point of the original curve lies on the new curve (checked against dense samples of both halves).
-    const newSegs = segmentsOf(after.doc.shapes[0].subpaths[0])
+    const newSegs = segmentsOf(after.doc.boards[0].shapes[0].subpaths[0])
     const dense = newSegs.flatMap((sg) =>
       Array.from({ length: 4001 }, (_, k) => evalSegment(sg, k / 4000)),
     )
@@ -161,7 +164,7 @@ describe('node tool: handle drag (AC21)', () => {
     expect(current()).toMatchObject({ mode: 'corner', hIn: { x: 12, y: 6 } })
     tool.cycleHandleMode?.()
     expect(current()).toMatchObject({ mode: 'symmetric', hIn: { x: 9, y: 12 } })
-    expect(nodeOverlay(state().doc, state().selection)).toContainEqual({
+    expect(nodeOverlay(contentOfFirstBoard(state().doc), state().selection)).toContainEqual({
       kind: 'handle',
       from: node.p,
       to: { x: 9, y: 12 },
@@ -323,12 +326,12 @@ describe('node deletion (AC22)', () => {
     store.setSelection({ shapeIds: [s.id], nodes: [refOf(s, a), refOf(s, b)] })
 
     store.dispatch(deleteSelectedNodes(store.getState().selection, 'break'))
-    expect(store.getState().doc.shapes).toHaveLength(0)
+    expect(store.getState().doc.boards[0].shapes).toHaveLength(0)
     expect(store.getState().selection.shapeIds).toEqual([])
     expect(store.getState().history.past).toHaveLength(1)
 
     store.undo()
-    expect(store.getState().doc.shapes[0].subpaths[0].nodes).toHaveLength(3)
+    expect(store.getState().doc.boards[0].shapes[0].subpaths[0].nodes).toHaveLength(3)
     // Undo returns to the selection from before the delete.
     expect(store.getState().selection.nodes).toEqual([refOf(s, a), refOf(s, b)])
   })
@@ -341,13 +344,14 @@ describe('node tool hit testing and overlay', () => {
     const s = shape([a, b])
     const doc = docWith([s])
     const sel = { shapeIds: [s.id], nodes: [] }
-    expect(hitNode(doc, { ...sel, nodes: [refOf(s, b)] }, { x: 16, y: 12 }, ZOOM)?.kind).toBe(
-      'handle',
-    )
+    expect(
+      hitNode(contentOfFirstBoard(doc), { ...sel, nodes: [refOf(s, b)] }, { x: 16, y: 12 }, ZOOM)
+        ?.kind,
+    ).toBe('handle')
     // Not selected: the handle is not hit, and nothing is in reach there.
-    expect(hitNode(doc, sel, { x: 16, y: 12 }, ZOOM)).toBeNull()
+    expect(hitNode(contentOfFirstBoard(doc), sel, { x: 16, y: 12 }, ZOOM)).toBeNull()
 
-    const overlay = nodeOverlay(doc, { ...sel, nodes: [refOf(s, b)] })
+    const overlay = nodeOverlay(contentOfFirstBoard(doc), { ...sel, nodes: [refOf(s, b)] })
     expect(overlay.filter((p) => p.kind === 'anchor')).toHaveLength(2)
     expect(overlay.filter((p) => p.kind === 'handle')).toEqual([
       { kind: 'handle', from: { x: 12, y: 12 }, to: { x: 16, y: 12 } },
@@ -363,7 +367,9 @@ describe('node tool hit testing and overlay', () => {
     const other = shape([n({ x: 50, y: 50 }), n({ x: 60, y: 50 })])
     const doc = docWith([open, closed, other])
     const outlines = (ids: string[]) =>
-      nodeOverlay(doc, { shapeIds: ids, nodes: [] }).filter((p) => p.kind === 'segmentOutline')
+      nodeOverlay(contentOfFirstBoard(doc), { shapeIds: ids, nodes: [] }).filter(
+        (p) => p.kind === 'segmentOutline',
+      )
     expect(outlines([open.id])).toHaveLength(2)
     expect(outlines([closed.id])).toHaveLength(4)
     expect(outlines([other.id, open.id])).toHaveLength(3)
@@ -374,8 +380,10 @@ describe('node tool hit testing and overlay', () => {
     const open = shape([n({ x: 0, y: 0 }), n({ x: 10, y: 0 }), n({ x: 10, y: 10 })])
     const doc = docWith([open])
     const sel = { shapeIds: [open.id], nodes: [] }
-    expect(selectionOutline(doc, sel)).toHaveLength(2)
-    expect(nodeOverlay(doc, sel).slice(0, 2)).toEqual(selectionOutline(doc, sel))
+    expect(selectionOutline(contentOfFirstBoard(doc), sel)).toHaveLength(2)
+    expect(nodeOverlay(contentOfFirstBoard(doc), sel).slice(0, 2)).toEqual(
+      selectionOutline(contentOfFirstBoard(doc), sel),
+    )
   })
 })
 
@@ -415,7 +423,7 @@ describe('node tool hover refresh after a doc change without pointer movement', 
     tool.refreshHover()
     const hl = tool.overlay().find((p) => p.kind === 'segmentHover')
     expect(hl).toBeDefined()
-    const seg = segmentsOf(store.getState().doc.shapes[0].subpaths[0])[0]
+    const seg = segmentsOf(store.getState().doc.boards[0].shapes[0].subpaths[0])[0]
     expect(hl).toEqual({
       kind: 'segmentHover',
       from: seg.from.p,

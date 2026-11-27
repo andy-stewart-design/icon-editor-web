@@ -1,3 +1,4 @@
+import { activeContent } from '../store'
 import { shapeBounds, type Rect } from '../geometry/bounds'
 import { guidesFor } from '../guides'
 import { snapPoint, snapToleranceDoc, type SnapContext } from '../snap'
@@ -12,7 +13,7 @@ import type { SnapFn } from './types'
 // `excludeBoundsIds` lists shapes whose bounds are not targets. While a node of a shape is dragged, the shape's own
 // bounds move with it, so snapping to them would pin the pointer to itself and defeat the grid on that axis.
 export function buildSnapFn(
-  state: Pick<EditorState, 'doc' | 'ui'>,
+  state: Pick<EditorState, 'doc' | 'activeBoardId' | 'ui'>,
   zoom: number,
   suspendSnap: boolean,
   exclude: ReadonlySet<string> = new Set(),
@@ -20,7 +21,8 @@ export function buildSnapFn(
   excludeBoundsIds: ReadonlySet<string> = new Set(),
 ): SnapFn {
   const { ui } = state
-  const shapes = state.doc.shapes.filter((s) => !exclude.has(s.id))
+  const { size, shapes: owned } = activeContent(state)
+  const shapes = owned.filter((s) => !exclude.has(s.id))
   const ctx: SnapContext = {
     enabled: ui.snapEnabled && !suspendSnap,
     increment: ui.snapIncrement,
@@ -33,7 +35,7 @@ export function buildSnapFn(
       .filter((s) => !excludeBoundsIds.has(s.id))
       .map((s) => shapeBounds(s))
       .filter((r): r is Rect => r !== null),
-    guides: ui.showKeylines ? guidesFor(state.doc.size) : [],
+    guides: ui.showKeylines ? guidesFor(size) : [],
   }
   return (pt) => snapPoint(pt, ctx)
 }

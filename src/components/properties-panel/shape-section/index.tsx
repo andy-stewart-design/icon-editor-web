@@ -19,7 +19,7 @@ import {
   type Rect,
   type StyleField,
 } from '../../../core'
-import { useEditor, useEditorStore } from '../../../hooks/use-editor'
+import { useEditor, useEditorStore, useActiveContent } from '../../../hooks/use-editor'
 import NumberField from '../../number-field'
 import SegmentedControl from '../../segmented-control'
 import s from './styles.module.css'
@@ -40,7 +40,7 @@ const JOINS = [
 // overrides applied to every selected shape; "Inherited" means the value comes from the document default.
 export default function ShapeSection() {
   const store = useEditorStore()
-  const doc = useEditor((e) => e.doc)
+  const doc = useActiveContent()
   const selection = useEditor((e) => e.selection)
 
   const rect = useMemo(() => selectionRect(doc, selection), [doc, selection])

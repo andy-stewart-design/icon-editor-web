@@ -2,7 +2,7 @@ import type { Command, Recipe } from '../commands'
 import { selectionBounds, type Rect } from '../geometry/bounds'
 import { scaleAbout, translate } from '../geometry/transform'
 import type { Selection } from '../history'
-import type { IconDoc, Linecap, Linejoin, PathShape, Style } from '../model'
+import type { BoardContent, Linecap, Linejoin, PathShape, Style } from '../model'
 import { isValidBoundsCoord, isValidBoundsSize } from '../validation'
 
 // Per-shape style overrides. Each field is either absent (inherit the doc default) or set on the shape.
@@ -72,14 +72,14 @@ export type FieldState<V> =
   | { kind: 'mixed' }
 
 // Selected shapes in doc order. Stale ids in the selection are skipped.
-function selectedShapes(doc: IconDoc, sel: Selection): PathShape[] {
+function selectedShapes(doc: BoardContent, sel: Selection): PathShape[] {
   const ids = new Set(sel.shapeIds)
   return doc.shapes.filter((s) => ids.has(s.id))
 }
 
 // The effective value falls back to the doc default when a shape has no override.
 export function selectionField<F extends StyleField>(
-  doc: IconDoc,
+  doc: BoardContent,
   sel: Selection,
   field: F,
 ): FieldState<StyleValue<F>> {
@@ -96,12 +96,16 @@ export function selectionField<F extends StyleField>(
 }
 
 // True when any selected shape sets an override for the field. The panel uses this to enable Reset.
-export function selectionHasOverride(doc: IconDoc, sel: Selection, field: StyleField): boolean {
+export function selectionHasOverride(
+  doc: BoardContent,
+  sel: Selection,
+  field: StyleField,
+): boolean {
   return selectedShapes(doc, sel).some((s) => s.style[field] !== undefined)
 }
 
 // Current combined geometry bounds of the selection, or null when nothing selected has geometry.
-export function selectionRect(doc: IconDoc, sel: Selection): Rect | null {
+export function selectionRect(doc: BoardContent, sel: Selection): Rect | null {
   const b = selectionBounds(selectedShapes(doc, sel))
   return b ? { x: b.x, y: b.y, w: b.w, h: b.h } : null
 }

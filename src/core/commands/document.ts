@@ -1,14 +1,14 @@
 import type { Command } from '../commands'
 import { scaleDoc } from '../geometry/transform'
 import { isValidArtboardSize, isValidStrokeWidth } from '../validation'
-import type { IconDoc, Linecap, Linejoin } from '../model'
+import type { Linecap, Linejoin } from '../model'
 
 // Document-level defaults. Each one is a single entry. Assigning the same value leaves the doc reference unchanged,
 // so dispatch records nothing.
 export function setDocStrokeWidth(width: number): Command {
   return {
     label: 'Document stroke width',
-    recipe: (d) => {
+    recipe: (_, d) => {
       if (!isValidStrokeWidth(width) || d.strokeWidth === width) return
       d.strokeWidth = width
     },
@@ -18,7 +18,7 @@ export function setDocStrokeWidth(width: number): Command {
 export function setDocLinecap(cap: Linecap): Command {
   return {
     label: 'Document linecap',
-    recipe: (d) => {
+    recipe: (_, d) => {
       if (d.linecap !== cap) d.linecap = cap
     },
   }
@@ -27,7 +27,7 @@ export function setDocLinecap(cap: Linecap): Command {
 export function setDocLinejoin(join: Linejoin): Command {
   return {
     label: 'Document linejoin',
-    recipe: (d) => {
+    recipe: (_, d) => {
       if (d.linejoin !== join) d.linejoin = join
     },
   }
@@ -48,7 +48,7 @@ export function resizeArtboard(size: number, mode: ResizeMode): Command {
         return
       }
       // scaleDoc reads the draft and returns a new doc. Copying size and shapes back keeps the other fields intact.
-      const next = scaleDoc(d as IconDoc, size)
+      const next = scaleDoc(d, size)
       d.size = next.size
       d.shapes = next.shapes
     },

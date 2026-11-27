@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { isNodeSelect, docToScreen, nodeOverlay } from '../../../core'
-import { useEditor } from '../../../hooks/use-editor'
+import { useEditor, useActiveContent, useBoardViewport } from '../../../hooks/use-editor'
 import s from './styles.module.css'
 
 const ANCHOR_HALF = 3 // half the side of an anchor square, screen px
@@ -12,9 +12,9 @@ const HANDLE_DOT_RADIUS = 3 // screen px
 // overlay draws hover feedback on top.
 export default function NodeOverlay() {
   const active = useEditor((e) => isNodeSelect(e.ui))
-  const doc = useEditor((e) => e.doc)
+  const doc = useActiveContent()
   const selection = useEditor((e) => e.selection)
-  const vp = useEditor((e) => e.ui.viewport)
+  const vp = useBoardViewport()
   const prims = useMemo(() => (active ? nodeOverlay(doc, selection) : []), [active, doc, selection])
   if (!active || prims.length === 0) return null
 

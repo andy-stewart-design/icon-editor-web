@@ -1,4 +1,4 @@
-import type { IconDoc, PathNode, PathShape, Pt } from '../model'
+import type { BoardContent, PathNode, PathShape, Pt } from '../model'
 
 // Applies f to every anchor and handle. Absent handles stay absent. Node modes and style are kept.
 export function mapPoints(shape: PathShape, f: (p: Pt) => Pt): PathShape {
@@ -48,7 +48,10 @@ export function flipV(shape: PathShape, axisY: number): PathShape {
 
 // Artboard resize with "scale with artboard": coordinates scale by newSize / size about the origin.
 // Stroke widths and styles are untouched; the doc's stroke width is never scaled.
-export function scaleDoc(doc: IconDoc, newSize: number): IconDoc {
+export function scaleDoc<T extends Pick<BoardContent, 'size' | 'shapes'>>(
+  doc: T,
+  newSize: number,
+): T {
   if (newSize === doc.size) return doc
   const k = newSize / doc.size
   const origin = { x: 0, y: 0 }

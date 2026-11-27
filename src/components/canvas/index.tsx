@@ -1,5 +1,5 @@
 import { useLayoutEffect, useMemo, useRef, type CSSProperties } from 'react'
-import { fitViewport } from '../../core'
+import { activeBoard, boardContent, initialWorkspaceViewport } from '../../core'
 import { useEditor, useEditorStore } from '../../hooks/use-editor'
 import { useToolInput } from '../../hooks/use-tool-input'
 import { useViewportInput } from '../../hooks/use-viewport-input'
@@ -19,14 +19,16 @@ export default function Canvas() {
   // Tool handlers coexist with the viewport handlers: viewport pan takes the pointer when it starts first.
   const tools = useToolInput()
   const doc = useEditor((st) => st.doc)
+  const board = useEditor(activeBoard)
   const preview = tools.primitives.find((p) => p.kind === 'contourPreview')
   // Use the same temporary geometry for the styled path and its selection outline.
   // Nothing outside these render layers reads the preview as document state.
   const displayDoc = useMemo(() => {
-    if (!preview) return doc
+    const content = boardContent(doc, board)
+    if (!preview) return content
     return {
-      ...doc,
-      shapes: doc.shapes.map((shape) =>
+      ...content,
+      shapes: content.shapes.map((shape) =>
         shape.id === preview.shapeId && shape.subpaths.includes(preview.previous)
           ? {
               ...shape,
@@ -35,8 +37,8 @@ export default function Canvas() {
           : shape,
       ),
     }
-  }, [doc, preview])
-  // The first non-zero measurement always fits the artboard, so a measured canvas means a fitted view.
+  }, [doc, board, preview])
+  // The first non-zero measurement frames the workspace, so a measured canvas means a fitted view.
   // Layers stay unrendered until then, so the default viewport never paints.
   const ready = useEditor((st) => st.ui.canvasSize.width > 0 && st.ui.canvasSize.height > 0)
 
@@ -50,11 +52,11 @@ export default function Canvas() {
       const prev = ui.canvasSize
       if (width === prev.width && height === prev.height) return
       const canvasSize = { width, height }
-      // The first non-zero measurement fits the artboard; later resizes keep the current view.
+      // The first non-zero measurement fits the workspace; later resizes keep the current view.
       const first = prev.width === 0 && prev.height === 0 && width > 0 && height > 0
       store.setUi(
         first
-          ? { canvasSize, viewport: fitViewport(canvasSize, doc.size, doc.size) }
+          ? { canvasSize, viewport: initialWorkspaceViewport(canvasSize, doc) }
           : { canvasSize },
       )
     }
@@ -76,9 +78,18 @@ export default function Canvas() {
     >
       {ready && (
         <>
-          <GridLayer />
+          {doc.boards.map((item) => (
+            <GridLayer key={item.id} board={item} />
+          ))}
+          <GridLayer board={board} active />
           <KeylineLayer />
-          <ContentLayer doc={displayDoc} />
+          {doc.boards.map((item) => (
+            <ContentLayer
+              key={item.id}
+              origin={item.origin}
+              doc={item === board ? displayDoc : boardContent(doc, item)}
+            />
+          ))}
           <SelectionOutline doc={displayDoc} />
           <SelectionOverlay />
           <NodeOverlay />

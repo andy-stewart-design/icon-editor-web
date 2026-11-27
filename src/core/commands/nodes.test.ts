@@ -1,7 +1,8 @@
+import { contentOfFirstBoard, workspaceWithShapes } from '../test-fixtures/artboard-workspace'
 import { describe, expect, it } from 'vitest'
 import { newId } from '../ids'
 import { resolveSegment, type NodeRef } from '../history'
-import { createDefaultDoc, type IconDoc, type PathNode, type PathShape, type Pt } from '../model'
+import { type IconDoc, type PathNode, type PathShape, type Pt } from '../model'
 import { createEditorStore } from '../store'
 import {
   cutSelectedSegment,
@@ -28,9 +29,9 @@ const refOf = (s: PathShape, node: PathNode): NodeRef => ({
   subpathId: s.subpaths[0].id,
   nodeId: node.id,
 })
-const docWith = (shapes: PathShape[]): IconDoc => ({ ...createDefaultDoc(), shapes })
+const docWith = (shapes: PathShape[]): IconDoc => workspaceWithShapes(shapes)
 const nodesOf = (doc: IconDoc, s: PathShape) =>
-  doc.shapes.find((x) => x.id === s.id)!.subpaths[0].nodes
+  doc.boards[0].shapes.find((x) => x.id === s.id)!.subpaths[0].nodes
 
 describe('node position (AC31)', () => {
   it('X = 5 moves the anchor and its handles follow by the same delta', () => {
@@ -121,7 +122,7 @@ describe('node mode commands', () => {
     expect(node.mode).toBe('corner')
     expect(node.hIn).toBeDefined()
     expect(node.hOut).toBeDefined()
-    expect(nodePanelState(store.getState().doc, sel)?.mode).toBe('free')
+    expect(nodePanelState(contentOfFirstBoard(store.getState().doc), sel)?.mode).toBe('free')
     expect(store.getState().history.past).toHaveLength(1)
   })
 
@@ -138,7 +139,9 @@ describe('node mode commands', () => {
 describe('node panel state', () => {
   it('returns null with no resolved node selected', () => {
     const s = shape([n({ x: 1, y: 1 }), n({ x: 5, y: 5 })])
-    expect(nodePanelState(docWith([s]), { shapeIds: [s.id], nodes: [] })).toBeNull()
+    expect(
+      nodePanelState(contentOfFirstBoard(docWith([s])), { shapeIds: [s.id], nodes: [] }),
+    ).toBeNull()
   })
 
   it('derives straight, free, smooth and symmetric; reports mixed values', () => {
@@ -151,18 +154,23 @@ describe('node panel state', () => {
     const doc = docWith([s])
     const sel = (...ns: PathNode[]) => ({ shapeIds: [s.id], nodes: ns.map((x) => refOf(s, x)) })
 
-    expect(nodePanelState(doc, sel(straight))).toEqual({ count: 1, x: 1, y: 1, mode: 'straight' })
-    expect(nodePanelState(doc, sel(zeroHandle))?.mode).toBe('straight')
-    expect(nodePanelState(doc, sel(free))?.mode).toBe('free')
-    expect(nodePanelState(doc, sel(smooth))?.mode).toBe('smooth')
-    expect(nodePanelState(doc, sel(sym))?.mode).toBe('symmetric')
-    expect(nodePanelState(doc, sel(straight, free))).toEqual({
+    expect(nodePanelState(contentOfFirstBoard(doc), sel(straight))).toEqual({
+      count: 1,
+      x: 1,
+      y: 1,
+      mode: 'straight',
+    })
+    expect(nodePanelState(contentOfFirstBoard(doc), sel(zeroHandle))?.mode).toBe('straight')
+    expect(nodePanelState(contentOfFirstBoard(doc), sel(free))?.mode).toBe('free')
+    expect(nodePanelState(contentOfFirstBoard(doc), sel(smooth))?.mode).toBe('smooth')
+    expect(nodePanelState(contentOfFirstBoard(doc), sel(sym))?.mode).toBe('symmetric')
+    expect(nodePanelState(contentOfFirstBoard(doc), sel(straight, free))).toEqual({
       count: 2,
       x: 'mixed',
       y: 1,
       mode: 'mixed',
     })
-    expect(nodePanelState(doc, sel(straight, zeroHandle))).toEqual({
+    expect(nodePanelState(contentOfFirstBoard(doc), sel(straight, zeroHandle))).toEqual({
       count: 2,
       x: 'mixed',
       y: 1,
@@ -186,7 +194,7 @@ describe('deleteSelectedNodes (AC22, R13)', () => {
     })
 
     store.dispatch(deleteSelectedNodes(store.getState().selection, 'break'))
-    const after = store.getState().doc.shapes[0].subpaths
+    const after = store.getState().doc.boards[0].shapes[0].subpaths
     expect(after).toHaveLength(1)
     expect(after[0].closed).toBe(false)
     expect(after[0].nodes).toHaveLength(3)
@@ -206,7 +214,7 @@ describe('deleteSelectedNodes (AC22, R13)', () => {
       nodes: [{ shapeId: s.id, subpathId: sp.id, nodeId: sp.nodes[1].id }],
     })
     store.dispatch(deleteSelectedNodes(store.getState().selection, 'join'))
-    const out = store.getState().doc.shapes[0].subpaths[0]
+    const out = store.getState().doc.boards[0].shapes[0].subpaths[0]
     expect(out.closed).toBe(true)
     expect(out.nodes).toHaveLength(3)
   })
@@ -223,14 +231,14 @@ describe('cut selected segment', () => {
     const segment = { shapeId: s.id, subpathId: s.subpaths[0].id, fromId: b.id, toId: a.id }
     const selection = { shapeIds: [s.id], nodes: [], segment }
     store.setSelection(selection)
-    expect(resolveSegment(doc, segment)?.segment.index).toBe(1)
+    expect(resolveSegment(contentOfFirstBoard(doc), segment)?.segment.index).toBe(1)
     store.dispatch(cutSelectedSegment(store.getState().selection))
     const after = store.getState()
     expect(after.history.past).toHaveLength(1)
-    expect(after.doc.shapes[1]).toBe(other)
-    expect(after.doc.shapes[0].subpaths[0].closed).toBe(false)
+    expect(after.doc.boards[0].shapes[1]).toBe(other)
+    expect(after.doc.boards[0].shapes[0].subpaths[0].closed).toBe(false)
     expect(after.selection).toEqual({ shapeIds: [s.id], nodes: [] })
-    expect(resolveSegment(after.doc, segment)).toBeUndefined()
+    expect(resolveSegment(contentOfFirstBoard(after.doc), segment)).toBeUndefined()
     store.undo()
     expect(store.getState().doc).toBe(doc)
     expect(store.getState().selection).toEqual(selection)
@@ -290,9 +298,9 @@ describe('cut selected segment', () => {
         },
       })
       store.dispatch(cutSelectedSegment(store.getState().selection))
-      if (sp !== extra) expect(store.getState().doc.shapes[0].subpaths[0]).toBe(extra)
+      if (sp !== extra) expect(store.getState().doc.boards[0].shapes[0].subpaths[0]).toBe(extra)
     }
-    expect(store.getState().doc.shapes).toEqual([])
+    expect(store.getState().doc.boards[0].shapes).toEqual([])
     expect(store.getState().selection.shapeIds).toEqual([])
     expect(store.getState().history.past).toHaveLength(2)
   })

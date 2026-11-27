@@ -11,7 +11,7 @@ import {
   setNodeMode,
 } from '../geometry/nodes'
 import { resolveSegment, withoutSegment, type NodeRef, type Selection } from '../history'
-import type { IconDoc, PathNode, PathShape, Pt, Subpath } from '../model'
+import type { BoardContent, PathNode, PathShape, Pt, Subpath } from '../model'
 
 // Node commands. Each one is a single history entry. Recipes act on the node refs in the selection; a ref that no
 // longer exists is skipped. Recipes work on plain copies of the nodes (see plainNode), never on immer drafts, so the
@@ -75,7 +75,7 @@ function editSubpaths(
     set.add(r.nodeId)
     wanted.set(key, set)
   }
-  return (doc: IconDoc) => {
+  return (doc: Pick<BoardContent, 'shapes'>) => {
     for (const shape of doc.shapes) {
       shape.subpaths.forEach((sp, i) => {
         const ids = wanted.get(`${shape.id}\u0000${sp.id}`)
@@ -185,7 +185,7 @@ export function setSelectedNodesMode(sel: Selection, mode: NodePanelMode): Comma
 // Inserts a node on segment segIndex of the subpath at parameter t, shape preserved (see insertNodeAt). The new node
 // is selected (selectionAfter.nodes). An invalid segment or t leaves the doc unchanged and selects nothing new.
 export function insertNode(
-  doc: IconDoc,
+  doc: BoardContent,
   sel: Selection,
   at: { shapeId: string; subpathId: string; segIndex: number; t: number },
 ): Command {
@@ -285,7 +285,7 @@ export function cutSelectedSegment(sel: Selection): Command {
 }
 
 // Resolves the selected node refs against the doc. Refs that no longer exist are dropped.
-export function selectedNodes(doc: IconDoc, sel: Selection): ResolvedNode[] {
+export function selectedNodes(doc: BoardContent, sel: Selection): ResolvedNode[] {
   const out: ResolvedNode[] = []
   for (const ref of sel.nodes) {
     const shape = doc.shapes.find((s) => s.id === ref.shapeId)
@@ -307,7 +307,7 @@ export function nodePanelMode(node: PathNode): NodePanelMode {
 }
 
 // Panel state for the selection, or null when no selected node exists in the doc.
-export function nodePanelState(doc: IconDoc, sel: Selection): NodePanelState | null {
+export function nodePanelState(doc: BoardContent, sel: Selection): NodePanelState | null {
   const picked = selectedNodes(doc, sel)
   if (picked.length === 0) return null
   const axis = (vals: number[]): number | 'mixed' =>
@@ -324,7 +324,7 @@ export function nodePanelState(doc: IconDoc, sel: Selection): NodePanelState | n
 // Build the edit only while the pinned geometry is current. The store uses immutable snapshots;
 // comparing the subpaths reference allows unrelated changes (including style) to survive.
 export function drawContour(
-  doc: IconDoc,
+  doc: BoardContent,
   pinned: PathShape,
   next: Subpath,
   previous?: Subpath,

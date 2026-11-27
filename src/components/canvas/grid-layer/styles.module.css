@@ -25,3 +25,8 @@
 .subgrid {
   stroke: #efefef;
 }
+
+.active {
+  fill: none;
+  stroke: #1e7be0;
+}

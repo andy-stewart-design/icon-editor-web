@@ -2,13 +2,18 @@ import type { Command } from '../commands'
 import { selectionBounds } from '../geometry/bounds'
 import { translate } from '../geometry/transform'
 import { resolveSegment, type Selection } from '../history'
-import type { IconDoc, PathNode, PathShape, Pt } from '../model'
+import type { BoardContent, PathNode, PathShape, Pt } from '../model'
 import { cloneWithNewIds, deleteSelection } from './arrange'
 import { deleteSelectedNodes, selectedNodes } from './nodes'
 
 export type Clipboard = { kind: 'shapes' | 'points'; shapes: PathShape[] }
 
-export function captureClipboard(doc: IconDoc, sel: Selection, nodeSelect: boolean, cut: boolean) {
+export function captureClipboard(
+  doc: BoardContent,
+  sel: Selection,
+  nodeSelect: boolean,
+  cut: boolean,
+) {
   if (!nodeSelect || (!sel.nodes.length && !sel.segment)) {
     const picked = new Set(sel.shapeIds)
     const shapes = doc.shapes.filter((shape) => picked.has(shape.id))
@@ -75,7 +80,7 @@ export function captureClipboard(doc: IconDoc, sel: Selection, nodeSelect: boole
 }
 
 export function pasteClipboard(
-  doc: IconDoc,
+  doc: BoardContent,
   sel: Selection,
   nodeSelect: boolean,
   payload: Clipboard,

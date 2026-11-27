@@ -1,5 +1,5 @@
-import { docToScreen, guidesFor, type Guide, type Viewport } from '../../../core'
-import { useEditor } from '../../../hooks/use-editor'
+import { activeBoard, docToScreen, guidesFor, type Guide, type Viewport } from '../../../core'
+import { useEditor, useBoardViewport } from '../../../hooks/use-editor'
 import s from './styles.module.css'
 
 // Guides are drawn in screen pixels from doc coordinates, so their 1 px strokes stay constant at any zoom.
@@ -25,8 +25,8 @@ function GuideShape({ guide, vp }: { guide: Guide; vp: Viewport }) {
 // Keyline overlay: sits above the grid and below the content, and is never serialized.
 export default function KeylineLayer() {
   const show = useEditor((e) => e.ui.showKeylines)
-  const size = useEditor((e) => e.doc.size)
-  const vp = useEditor((e) => e.ui.viewport)
+  const size = useEditor((e) => activeBoard(e).size)
+  const vp = useBoardViewport()
   if (!show) return null
 
   return (

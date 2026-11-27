@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import {
+  activeBoard,
+  workspaceViewport,
   actualSizeViewport,
   createDefaultDoc,
   fitViewport,
@@ -58,19 +60,26 @@ export default function Toolbar() {
   const activeTool = useEditor((e) => e.ui.activeTool)
 
   const fit = () => {
-    const { doc, ui } = store.getState()
-    store.setUi({ viewport: fitViewport(ui.canvasSize, doc.size, doc.size) })
+    const state = store.getState()
+    const { ui } = state
+    const { size, origin } = activeBoard(state)
+    store.setUi({ viewport: workspaceViewport(fitViewport(ui.canvasSize, size, size), origin) })
   }
 
   const actualSize = () => {
-    const { doc, ui } = store.getState()
-    store.setUi({ viewport: actualSizeViewport(ui.canvasSize, doc.size, doc.size) })
+    const state = store.getState()
+    const { ui } = state
+    const { size, origin } = activeBoard(state)
+    store.setUi({
+      viewport: workspaceViewport(actualSizeViewport(ui.canvasSize, size, size), origin),
+    })
   }
 
-  // Autosave persists the replacement through subscribeCommitted; the viewport already fits the same artboard size.
+  // Autosave persists the replacement through subscribeCommitted.
   const newDocument = () => {
     if (!window.confirm('Start a new document? The current one will be replaced.')) return
     store.replaceDocument(createDefaultDoc())
+    fit()
   }
 
   return (

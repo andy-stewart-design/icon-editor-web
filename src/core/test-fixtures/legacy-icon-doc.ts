@@ -1,4 +1,4 @@
-import type { IconDoc } from '../model'
+import type { LegacyIconDoc } from '../model'
 
 export const legacyIconDoc = {
   id: 'legacy-icon',
@@ -40,7 +40,7 @@ export const legacyIconDoc = {
       ],
     },
   ],
-} satisfies IconDoc
+} satisfies LegacyIconDoc
 
 export const legacyIconSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="butt" stroke-linejoin="miter">
   <path d="M-4 8C1 -6 30 4 36 22"/>

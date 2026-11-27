@@ -1,30 +1,38 @@
+import { artboardWorkspace } from './test-fixtures/artboard-workspace'
 import { describe, expect, it } from 'vitest'
 import { createEditorStore } from './store'
-import type { IconDoc } from './model'
+import type { Artboard, IconDoc } from './model'
 import type { Selection } from './history'
 
 const emptySel: Selection = { shapeIds: [], nodes: [] }
 
 const baseDoc = (): IconDoc => ({
   id: 'doc1',
-  version: 1,
-  size: 24,
+  version: 2,
   strokeWidth: 1.5,
   linecap: 'round',
   linejoin: 'round',
-  shapes: [
+  boards: [
     {
-      id: 's1',
-      type: 'path',
-      style: {},
-      subpaths: [
-        { id: 'sp1', closed: false, nodes: [{ id: 'n1', p: { x: 0, y: 0 }, mode: 'corner' }] },
+      id: 'board1',
+      name: 'Artboard 1',
+      size: 24,
+      origin: { x: 0, y: 0 },
+      shapes: [
+        {
+          id: 's1',
+          type: 'path',
+          style: {},
+          subpaths: [
+            { id: 'sp1', closed: false, nodes: [{ id: 'n1', p: { x: 0, y: 0 }, mode: 'corner' }] },
+          ],
+        },
       ],
     },
   ],
 })
 
-const addShape = (id: string) => (d: IconDoc) => {
+const addShape = (id: string) => (d: Artboard) => {
   d.shapes.push({ id, type: 'path', style: {}, subpaths: [] })
 }
 
@@ -41,7 +49,7 @@ describe('editor store history', () => {
         d.shapes[0].subpaths[0].nodes[0].p.x = i
       })
     }
-    expect(store.getState().doc.shapes[0].subpaths[0].nodes[0].p.x).toBe(50)
+    expect(store.getState().doc.boards[0].shapes[0].subpaths[0].nodes[0].p.x).toBe(50)
     expect(committed).toHaveLength(0)
     expect(store.canUndo()).toBe(false)
 
@@ -55,7 +63,7 @@ describe('editor store history', () => {
     expect(committed).toHaveLength(2)
 
     store.redo()
-    expect(store.getState().doc.shapes[0].subpaths[0].nodes[0].p.x).toBe(50)
+    expect(store.getState().doc.boards[0].shapes[0].subpaths[0].nodes[0].p.x).toBe(50)
   })
 
   it('cancel restores the base doc with no entry and no notification', () => {
@@ -83,7 +91,7 @@ describe('editor store history', () => {
 
     store.updateDoc('Add B', addShape('B'))
     expect(store.canRedo()).toBe(false)
-    expect(store.getState().doc.shapes.map((s) => s.id)).toEqual(['s1', 'B'])
+    expect(store.getState().doc.boards[0].shapes.map((s) => s.id)).toEqual(['s1', 'B'])
   })
 
   it('restores the selection on undo and drops IDs that no longer exist', () => {
@@ -177,7 +185,11 @@ describe('replaceDocument', () => {
     const seen: IconDoc[] = []
     store.subscribeCommitted((doc) => seen.push(doc))
 
-    const next: IconDoc = { ...baseDoc(), id: 'doc2', shapes: [] }
+    const next: IconDoc = {
+      ...baseDoc(),
+      id: 'doc2',
+      boards: [{ ...baseDoc().boards[0], id: 'board2', shapes: [] }],
+    }
     store.replaceDocument(next)
 
     const state = store.getState()
@@ -187,5 +199,38 @@ describe('replaceDocument', () => {
     expect(store.canUndo()).toBe(false)
     expect(store.canRedo()).toBe(false)
     expect(seen).toEqual([next])
+  })
+})
+
+describe('board-scoped history', () => {
+  it('restores the edited board and its selection on undo/redo, without touching other artwork', () => {
+    const store = createEditorStore(artboardWorkspace)
+    const [small, large] = artboardWorkspace.boards
+    store.setSelection({ shapeIds: ['small-overflow', 'large-overflow'], nodes: [] })
+    expect(store.getState().selection.shapeIds).toEqual(['small-overflow'])
+    store.activateBoard(large.id)
+    expect(store.getState().selection).toEqual(emptySel)
+    const selection = { shapeIds: ['large-overflow'], nodes: [] }
+    store.setSelection(selection)
+    store.begin('Translate path')
+    store.activateBoard(small.id) // a press-time transaction owns the board until it ends
+    store.update((board) => {
+      board.shapes[0].subpaths[0].nodes[0].p.x -= 10
+    })
+    store.commit()
+    expect(store.getState().doc.boards[0]).toBe(small)
+    const after = store.getState().doc
+    store.activateBoard(small.id)
+    store.undo()
+    expect(store.getState()).toMatchObject({
+      doc: artboardWorkspace,
+      activeBoardId: large.id,
+      selection,
+    })
+    store.activateBoard(small.id)
+    store.redo()
+    expect(store.getState()).toMatchObject({ doc: after, activeBoardId: large.id, selection })
+    store.replaceDocument(baseDoc())
+    expect(store.getState()).toMatchObject({ activeBoardId: 'board1', selection: emptySel })
   })
 })

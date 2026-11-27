@@ -1,7 +1,8 @@
+import { contentOfFirstBoard, workspaceWithShapes } from '../test-fixtures/artboard-workspace'
 import { describe, expect, it } from 'vitest'
 import { makeLine, makeRect } from '../geometry/shapes'
 import { selectionBounds } from '../geometry/bounds'
-import { createDefaultDoc, type IconDoc, type PathShape } from '../model'
+import { type PathShape } from '../model'
 import { createEditorStore } from '../store'
 import { resizeArtboard, setDocLinecap, setDocStrokeWidth } from './document'
 import {
@@ -25,8 +26,8 @@ function rect(x: number, y: number, w: number, h: number): PathShape {
   return s
 }
 
-function setup(shapes: PathShape[], overrides: Partial<IconDoc> = {}) {
-  const store = createEditorStore({ ...createDefaultDoc(), ...overrides, shapes })
+function setup(shapes: PathShape[]) {
+  const store = createEditorStore(workspaceWithShapes(shapes))
   const select = (...ids: string[]) => store.setSelection({ shapeIds: ids, nodes: [] })
   return { store, select }
 }
@@ -36,11 +37,11 @@ const anchors = (s: PathShape) => s.subpaths.flatMap((sp) => sp.nodes.map((n) =>
 describe('artboard resize (AC27, AC28)', () => {
   it('stay in place changes only the size and keeps coordinates (AC27)', () => {
     const l = line([2, 2], [22, 22])
-    const { store } = setup([l], { size: 24 })
+    const { store } = setup([l])
     store.dispatch(resizeArtboard(32, 'keep'))
     const doc = store.getState().doc
-    expect(doc.size).toBe(32)
-    expect(anchors(doc.shapes[0])).toEqual([
+    expect(doc.boards[0].size).toBe(32)
+    expect(anchors(doc.boards[0].shapes[0])).toEqual([
       { x: 2, y: 2 },
       { x: 22, y: 22 },
     ])
@@ -52,11 +53,11 @@ describe('artboard resize (AC27, AC28)', () => {
     l.style = { strokeWidth: 3 }
     const { store } = setup([l])
     const doc0 = store.getState().doc
-    expect(doc0.size).toBe(24)
+    expect(doc0.boards[0].size).toBe(24)
     store.dispatch(resizeArtboard(32, 'scale'))
     const doc = store.getState().doc
-    expect(doc.size).toBe(32)
-    const [out] = doc.shapes
+    expect(doc.boards[0].size).toBe(32)
+    const [out] = doc.boards[0].shapes
     const [a, b] = anchors(out)
     expect(a.x).toBeCloseTo(2.6667, 3)
     expect(a.y).toBeCloseTo(2.6667, 3)
@@ -90,21 +91,29 @@ describe('style overrides (AC30)', () => {
     b.style = { linecap: 'round' }
     const { store, select } = setup([a, b])
     select(a.id, b.id)
-    expect(selectionField(store.getState().doc, store.getState().selection, 'linecap')).toEqual({
+    expect(
+      selectionField(
+        contentOfFirstBoard(store.getState().doc),
+        store.getState().selection,
+        'linecap',
+      ),
+    ).toEqual({
       kind: 'mixed',
     })
 
     store.dispatch(setLinecapOverride(store.getState().selection, 'butt'))
     const doc = store.getState().doc
-    expect(selectionField(doc, store.getState().selection, 'linecap')).toEqual({
-      kind: 'same',
-      value: 'butt',
-      overridden: true,
-    })
+    expect(selectionField(contentOfFirstBoard(doc), store.getState().selection, 'linecap')).toEqual(
+      {
+        kind: 'same',
+        value: 'butt',
+        overridden: true,
+      },
+    )
 
     select(a.id)
     store.dispatch(resetLinecap(store.getState().selection))
-    const after = store.getState().doc.shapes[0]
+    const after = store.getState().doc.boards[0].shapes[0]
     expect('linecap' in after.style).toBe(false)
     expect(after.style).toEqual({})
   })
@@ -115,13 +124,13 @@ describe('style overrides (AC30)', () => {
     select(a.id)
     const sel = store.getState().selection
     const doc = store.getState().doc
-    expect(selectionField(doc, sel, 'strokeWidth')).toEqual({
+    expect(selectionField(contentOfFirstBoard(doc), sel, 'strokeWidth')).toEqual({
       kind: 'same',
       value: 1.5,
       overridden: false,
     })
     store.dispatch(setStrokeWidthOverride(sel, 2))
-    expect(selectionField(store.getState().doc, sel, 'strokeWidth')).toEqual({
+    expect(selectionField(contentOfFirstBoard(store.getState().doc), sel, 'strokeWidth')).toEqual({
       kind: 'same',
       value: 2,
       overridden: true,
@@ -138,8 +147,8 @@ describe('setSelectionBounds', () => {
     const sel = store.getState().selection
     store.dispatch(setSelectionBounds(sel, 10, 5, 8, 12))
     const doc = store.getState().doc
-    expect(selectionRect(doc, sel)).toEqual({ x: 10, y: 5, w: 8, h: 12 })
-    expect(doc.shapes[0].style).toEqual({ strokeWidth: 2 })
+    expect(selectionRect(contentOfFirstBoard(doc), sel)).toEqual({ x: 10, y: 5, w: 8, h: 12 })
+    expect(doc.boards[0].shapes[0].style).toEqual({ strokeWidth: 2 })
     expect(store.getState().history.past).toHaveLength(1)
   })
 
@@ -149,7 +158,7 @@ describe('setSelectionBounds', () => {
     select(l.id)
     const sel = store.getState().selection
     store.dispatch(setSelectionBounds(sel, 1, 2, 20, 9))
-    const b = selectionBounds(store.getState().doc.shapes)!
+    const b = selectionBounds(store.getState().doc.boards[0].shapes)!
     expect(b).toEqual({ x: 1, y: 2, w: 20, h: 0 })
   })
 

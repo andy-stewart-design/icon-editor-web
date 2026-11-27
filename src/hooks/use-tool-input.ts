@@ -10,6 +10,9 @@ import {
 } from 'react'
 import {
   buildSnapFn,
+  activeViewport,
+  prepareToolPress,
+  paintedShapeAt,
   createEllipseTool,
   createLineTool,
   createNodeTool,
@@ -95,7 +98,7 @@ function toolEvent(store: EditorStore, local: Pt, mods: Modifiers, space: boolea
   const { viewport } = state.ui
   const suspendSnap = mods.metaKey || mods.ctrlKey
   return {
-    pt: screenToDoc(viewport, local),
+    pt: screenToDoc(activeViewport(state), local),
     zoom: viewport.zoom,
     shift: mods.shiftKey,
     alt: mods.altKey,
@@ -113,6 +116,7 @@ export function useToolInput(): ToolInput {
   const [tool, setTool] = useState<Tool | null>(null)
   const toolRef = useRef<Tool | null>(null)
   const gestureRef = useRef<Gesture | null>(null)
+  const [hoverPosition, setHoverPosition] = useState<Pt | null>(null)
   const hoverRef = useRef<{ local: Pt; mods: Modifiers } | null>(null)
   // Space is tracked for the whole session, so a tool change cannot miss the release.
   const spaceRef = useRef(false)
@@ -136,6 +140,7 @@ export function useToolInput(): ToolInput {
       const old = toolRef.current
       toolRef.current = null
       hoverRef.current = null
+      setHoverPosition(null)
       releaseGesture(gestureRef)
       old?.pointerCancel()
       old?.deactivate?.()
@@ -180,7 +185,15 @@ export function useToolInput(): ToolInput {
         }
         return
       }
+      if (
+        (next.activeBoardId !== previous.activeBoardId || next.doc.id !== previous.doc.id) &&
+        gestureRef.current
+      ) {
+        releaseGesture(gestureRef)
+        toolRef.current?.pointerCancel()
+      }
       const refresh =
+        next.activeBoardId !== previous.activeBoardId ||
         next.doc !== previous.doc ||
         next.selection !== previous.selection ||
         next.ui.viewport !== previous.ui.viewport ||
@@ -265,9 +278,11 @@ export function useToolInput(): ToolInput {
         // Before the first measurement the view is not fitted, so drawing there would place shapes wrongly.
         const { canvasSize } = store.getState().ui
         if (canvasSize.width === 0 || canvasSize.height === 0) return
-        e.currentTarget.setPointerCapture(e.pointerId)
         const local = localOf(e)
         hoverRef.current = null
+        setHoverPosition(null)
+        prepareToolPress(store, local, e.shiftKey, tool.hasActiveDrawing?.() ?? false)
+        e.currentTarget.setPointerCapture(e.pointerId)
         gestureRef.current = { id: e.pointerId, local, el: e.currentTarget }
         e.currentTarget.dataset.drawing = 'true'
         tool.pointerDown(toolEvent(store, local, e, spaceRef.current))
@@ -281,6 +296,7 @@ export function useToolInput(): ToolInput {
           const local = localOf(e)
           const { altKey, ctrlKey, metaKey, shiftKey } = e
           hoverRef.current = { local, mods: { altKey, ctrlKey, metaKey, shiftKey } }
+          setHoverPosition(local)
           tool.hover(toolEvent(store, local, e, spaceRef.current))
           bump()
           return
@@ -292,6 +308,7 @@ export function useToolInput(): ToolInput {
       },
       onPointerLeave() {
         hoverRef.current = null
+        setHoverPosition(null)
         if (gestureRef.current) return
         const { ui } = store.getState()
         if (isNodeSelect(ui)) toolRef.current?.deactivate?.() // clear hover, not the static selection
@@ -386,6 +403,7 @@ export function useToolInput(): ToolInput {
           const pressed = gestureRef.current !== null
           releaseGesture(gestureRef)
           hoverRef.current = null
+          setHoverPosition(null)
           tool.keyDown(e.key)
           if (e.key === 'Escape' && !pressed && isNodeSelect(ui)) store.setUi({ mode: 'shape' })
           bump()
@@ -415,9 +433,27 @@ export function useToolInput(): ToolInput {
     return () => controller.abort()
   }, [store])
 
+  const state = store.getState()
+  const primitives = tool?.overlay() ?? []
+  // Shape hover follows the painted stack without changing the active board.
+  if (hoverPosition && state.ui.activeTool === 'select') {
+    const vp = state.ui.viewport
+    const hit = paintedShapeAt(state.doc, screenToDoc(vp, hoverPosition), vp.zoom)
+    if (
+      hit &&
+      hit.board.id !== state.activeBoardId &&
+      !primitives.some((p) => p.kind !== 'hover')
+    ) {
+      return {
+        handlers,
+        cursor: tool?.cursor,
+        primitives: [{ kind: 'hover', shapeId: hit.shapeId, boardId: hit.board.id }],
+      }
+    }
+  }
   return {
     handlers,
     cursor: tool?.cursor,
-    primitives: tool ? tool.overlay() : [],
+    primitives,
   }
 }

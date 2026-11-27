@@ -10,9 +10,9 @@ import {
 } from './history'
 import { captureClipboard, pasteClipboard, type Clipboard } from './commands/clipboard'
 import type { ResizeMode } from './commands/document'
-import type { IconDoc } from './model'
+import { artboardFor, boardContent, type IconDoc } from './model'
 import type { LoadResult, SaveStatus } from './persistence'
-import { screenToDoc, type Size, type Viewport } from './viewport'
+import { boardViewport, screenToDoc, type Size, type Viewport } from './viewport'
 
 export type ActiveTool = 'select' | 'pen' | 'line' | 'rect' | 'ellipse'
 export type EditMode = 'shape' | 'node'
@@ -35,14 +35,32 @@ export type UiState = {
 }
 
 // An open gesture: `base` is the doc at begin(), and every update() recomputes from it.
-export type Transaction = { label: string; base: IconDoc; selectionBefore: Selection }
+export type Transaction = {
+  boardId: string
+  label: string
+  base: IconDoc
+  selectionBefore: Selection
+}
 
 export type EditorState = {
   doc: IconDoc
+  activeBoardId: string
   selection: Selection
   ui: UiState
   history: HistoryState
   tx: Transaction | null
+}
+
+export function activeBoard(state: Pick<EditorState, 'doc' | 'activeBoardId'>) {
+  return artboardFor(state.doc, state.activeBoardId)
+}
+
+export function activeContent(state: Pick<EditorState, 'doc' | 'activeBoardId'>) {
+  return boardContent(state.doc, activeBoard(state))
+}
+
+export function activeViewport(state: Pick<EditorState, 'doc' | 'activeBoardId' | 'ui'>) {
+  return boardViewport(state.ui.viewport, activeBoard(state).origin)
 }
 
 export const defaultUi: UiState = {
@@ -96,6 +114,7 @@ type HistoryInput = {
 export type EditorStore = {
   getState: () => EditorState
   subscribe: (listener: () => void) => () => void
+  activateBoard: (id: string) => void
   setSelection: (selection: Selection) => void
   setUi: (patch: Partial<UiState>) => void
   dispatch: (command: Command) => void
@@ -117,14 +136,18 @@ export type EditorStore = {
 export function createEditorStore(initialDoc: IconDoc): EditorStore {
   const api = createStore<EditorState>()(() => ({
     doc: initialDoc,
+    activeBoardId: initialDoc.boards[0].id,
     selection: emptySelection,
     ui: defaultUi,
     history: emptyHistory,
     tx: null,
   }))
   const listeners = new Set<Listener>()
-  const selectionFor = (sel: Selection, doc: IconDoc) =>
-    pruneSelection(isNodeSelect(api.getState().ui) ? sel : withoutSegment(sel), doc)
+  const selectionFor = (sel: Selection, doc: IconDoc, boardId: string) =>
+    pruneSelection(
+      isNodeSelect(api.getState().ui) ? sel : withoutSegment(sel),
+      artboardFor(doc, boardId),
+    )
   const commands = createCommands(api, (doc) => listeners.forEach((l) => l(doc)), selectionFor)
   let historyInput: HistoryInput | undefined
   let navigating = false
@@ -144,6 +167,9 @@ export function createEditorStore(initialDoc: IconDoc): EditorStore {
     }
   }
   let clipboard: Clipboard | undefined
+  // Preserve the distinction between an invalid node pick and a whole-shape pick for copy/cut.
+  // Paste still uses the live, pruned selection to pick its destination.
+  const invalidNodePicks = new WeakSet<Selection>()
   const setUi: EditorStore['setUi'] = (patch) => {
     const { ui, selection } = api.getState()
     const next = updateUi(ui, patch, selection)
@@ -155,14 +181,23 @@ export function createEditorStore(initialDoc: IconDoc): EditorStore {
   return {
     getState: api.getState,
     subscribe: api.subscribe,
+    activateBoard: (id) => {
+      const { doc, tx, activeBoardId } = api.getState()
+      if (!tx && id !== activeBoardId && doc.boards.some((board) => board.id === id)) {
+        api.setState({ activeBoardId: id, selection: emptySelection })
+      }
+    },
     setSelection: (selection) => {
-      api.setState({
-        selection: selection.segment ? selectionFor(selection, api.getState().doc) : selection,
-      })
+      const { doc, activeBoardId } = api.getState()
+      const next = selectionFor(selection, doc, activeBoardId)
+      if (selection.nodes.length && !next.nodes.length) invalidNodePicks.add(next)
+      api.setState({ selection: next })
     },
     setUi,
     clipboard: (action) => {
-      const { doc, selection, ui, tx } = api.getState()
+      const state = api.getState()
+      const { selection, ui, tx } = state
+      const doc = activeContent(state)
       if (tx) return
       const nodeSelect = isNodeSelect(ui)
       if (action === 'paste') {
@@ -172,13 +207,14 @@ export function createEditorStore(initialDoc: IconDoc): EditorStore {
         // Keep the original placement until the canvas has a visible area.
         const center =
           width > 0 && height > 0
-            ? screenToDoc(ui.viewport, { x: width / 2, y: height / 2 })
+            ? screenToDoc(activeViewport(state), { x: width / 2, y: height / 2 })
             : undefined
         const command = pasteClipboard(doc, selection, nodeSelect, payload, center)
         if (!command) return
         commands.dispatch(command)
         if (payload.kind === 'points' && !nodeSelect) setUi({ activeTool: 'select', mode: 'node' })
       } else {
+        if (nodeSelect && invalidNodePicks.has(selection)) return
         const captured = captureClipboard(doc, selection, nodeSelect, action === 'cut')
         if (!captured) return
         clipboard = captured.payload

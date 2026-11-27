@@ -1,4 +1,5 @@
 import {
+  activeBoard,
   resizeArtboard,
   setDocLinecap,
   setDocLinejoin,
@@ -39,7 +40,7 @@ export default function DocumentSection() {
   const strokeWidth = useEditor((e) => e.doc.strokeWidth)
   const linecap = useEditor((e) => e.doc.linecap)
   const linejoin = useEditor((e) => e.doc.linejoin)
-  const size = useEditor((e) => e.doc.size)
+  const size = useEditor((e) => activeBoard(e).size)
 
   return (
     <section className={s.section} aria-labelledby="document-section-heading">

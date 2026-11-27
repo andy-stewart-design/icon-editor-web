@@ -1,9 +1,9 @@
 import type { Command, Recipe } from '../commands'
 import type { Selection } from '../history'
-import type { IconDoc } from '../model'
+import type { BoardContent } from '../model'
 
 // Selects every shape. Recipe is a no-op, so dispatch records no history entry and only the selection changes.
-export function selectAll(doc: IconDoc): Command {
+export function selectAll(doc: BoardContent): Command {
   return {
     label: 'Select all',
     recipe: () => {},

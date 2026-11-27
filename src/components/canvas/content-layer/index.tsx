@@ -1,9 +1,15 @@
 import { useLayoutEffect, useRef } from 'react'
-import { docToScreen, presentationAttributes, serializeBody, type IconDoc } from '../../../core'
+import {
+  docToScreen,
+  presentationAttributes,
+  serializeBody,
+  type BoardContent,
+  type Pt,
+} from '../../../core'
 import { useEditor } from '../../../hooks/use-editor'
 import s from './styles.module.css'
 
-export default function ContentLayer({ doc }: { doc: IconDoc }) {
+export default function ContentLayer({ doc, origin }: { doc: BoardContent; origin: Pt }) {
   const vp = useEditor((e) => e.ui.viewport)
   const ref = useRef<SVGSVGElement>(null)
 
@@ -17,7 +23,7 @@ export default function ContentLayer({ doc }: { doc: IconDoc }) {
     el.innerHTML = serializeBody(doc)
   }, [doc])
 
-  const origin = docToScreen(vp, { x: 0, y: 0 })
+  const screen = docToScreen(vp, origin)
   const px = doc.size * vp.zoom
 
   return (
@@ -25,7 +31,7 @@ export default function ContentLayer({ doc }: { doc: IconDoc }) {
       ref={ref}
       className={s.content}
       viewBox={`0 0 ${doc.size} ${doc.size}`}
-      style={{ left: origin.x, top: origin.y, width: px, height: px }}
+      style={{ left: screen.x, top: screen.y, width: px, height: px }}
     />
   )
 }

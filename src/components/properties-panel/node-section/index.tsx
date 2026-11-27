@@ -7,7 +7,7 @@ import {
   validateBoundsCoord,
   type NodePanelMode,
 } from '../../../core'
-import { useEditor, useEditorStore } from '../../../hooks/use-editor'
+import { useEditor, useEditorStore, useActiveContent } from '../../../hooks/use-editor'
 import NumberField from '../../number-field'
 import SegmentedControl from '../../segmented-control'
 import s from './styles.module.css'
@@ -24,7 +24,7 @@ const MODES = [
 export default function NodeSection() {
   const store = useEditorStore()
   const active = useEditor((e) => isNodeSelect(e.ui))
-  const doc = useEditor((e) => e.doc)
+  const doc = useActiveContent()
   const selection = useEditor((e) => e.selection)
 
   const state = useMemo(

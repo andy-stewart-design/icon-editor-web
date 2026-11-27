@@ -1,3 +1,4 @@
+import { activeContent } from '../store'
 import { drawContour, insertNode } from '../commands/nodes'
 import { moveHandle } from '../geometry/nodes'
 import { newId } from '../ids'
@@ -64,6 +65,7 @@ export function createPenTool(
   let provisional: PathNode | undefined
   let fresh = false
   let transitioning = false
+  let drawingBoardId: string | undefined
   let press: Press | null = null
   let insertion: {
     shape: PathShape
@@ -77,7 +79,9 @@ export function createPenTool(
 
   const selectedShape = (): PathShape | undefined => {
     if (context.mode !== 'node') return
-    const { doc, selection } = host.getState()
+    const state = host.getState()
+    const { selection } = state
+    const doc = activeContent(state)
     if (selection.shapeIds.length === 1)
       return doc.shapes.find((s) => s.id === selection.shapeIds[0])
   }
@@ -102,6 +106,7 @@ export function createPenTool(
   }
 
   const finish = (): void => {
+    drawingBoardId = undefined
     provisional = undefined
     destination = undefined
     fresh = false
@@ -110,9 +115,14 @@ export function createPenTool(
     resetHover()
   }
 
-  const currentShape = (id: string) => host.getState().doc.shapes.find((s) => s.id === id)
+  const currentShape = (id: string) =>
+    activeContent(host.getState()).shapes.find((s) => s.id === id)
   const validate = () => {
     if (transitioning) return true
+    if (drawingBoardId && drawingBoardId !== host.getState().activeBoardId) {
+      finish()
+      return false
+    }
     if (insertion) {
       const shape = selectedShape()
       if (shape?.id === insertion.shape.id && shape.subpaths === insertion.shape.subpaths)
@@ -151,7 +161,9 @@ export function createPenTool(
   ) => {
     const pinned = destination
     const shapeId = newShape?.id ?? pinned?.shape.id
-    const { doc, tx } = host.getState()
+    const state = host.getState()
+    const { tx } = state
+    const doc = activeContent(state)
     const command = newShape
       ? addShapeCommand('Draw path', newShape)
       : pinned && drawContour(doc, pinned.shape, contour, pinned.endpoint?.subpath, edit)
@@ -235,6 +247,7 @@ export function createPenTool(
       if (press || insertion) return
       validate()
       resetHover()
+      drawingBoardId = host.getState().activeBoardId
       let start: Destination | undefined
       if (context.mode === 'node' && !destination) {
         const shape = selectedShape()
@@ -296,7 +309,9 @@ export function createPenTool(
         move(e)
         const { at, dragged } = insertion
         insertion = null
-        const { doc, selection, tx } = host.getState()
+        const state = host.getState()
+        const { selection, tx } = state
+        const doc = activeContent(state)
         if (!dragged && !tx) {
           host.dispatch(insertNode(doc, selection, at))
         }
@@ -413,6 +428,7 @@ export function createPenTool(
     afterHistory(applied, direction) {
       transitioning = false
       if (!applied) return
+      if (drawingBoardId && drawingBoardId !== host.getState().activeBoardId) finish()
       const pinned = destination
       if (pinned?.endpoint) attach(pinned.shape.id, pinned.endpoint.subpath.id, pinned.endpoint.end)
       else finish()

@@ -1,7 +1,5 @@
 import { formatNumber } from './format'
-import type { Linecap, Linejoin, PathNode, Pt, Shape, Subpath } from '../model'
-
-type StrokeDefaults = { strokeWidth: number; linecap: Linecap; linejoin: Linejoin }
+import type { PathNode, Pt, Shape, StrokeDefaults, Subpath } from '../model'
 
 // One square board, with paths in paint order and coordinates local to the board.
 export type SvgInput = StrokeDefaults & { size: number; shapes: readonly Shape[] }

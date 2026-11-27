@@ -1,15 +1,15 @@
 import { useMemo } from 'react'
-import { docToScreen, selectionOutline, type IconDoc } from '../../../core'
-import { useEditor } from '../../../hooks/use-editor'
+import { docToScreen, selectionOutline, type BoardContent } from '../../../core'
+import { useEditor, useBoardViewport } from '../../../hooks/use-editor'
 import s from './styles.module.css'
 
 // Thin neutral outline along every segment of the selected shapes, so a selection reads in Select mode too. The Node tool
 // shows the same outline, with its anchors and handles on top. Drawn below the Select tool's bounds and handles and
 // never takes pointer events, so hit testing and drag behavior are unchanged. Never serialized.
-export default function SelectionOutline({ doc }: { doc: IconDoc }) {
+export default function SelectionOutline({ doc }: { doc: BoardContent }) {
   const showOutline = useEditor((e) => e.ui.activeTool === 'select' || e.ui.mode === 'node')
   const selection = useEditor((e) => e.selection)
-  const vp = useEditor((e) => e.ui.viewport)
+  const vp = useBoardViewport()
   const shown = showOutline && selection.shapeIds.length > 0
   const prims = useMemo(
     () => (shown ? selectionOutline(doc, selection) : []),

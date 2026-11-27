@@ -1,4 +1,4 @@
-import type { Pt } from './model'
+import type { IconDoc, Pt } from './model'
 
 // zoom = CSS px per doc unit (1 = 100%, 32 = 3200%); pan = screen position of the doc origin in the canvas element.
 export type Viewport = { zoom: number; panX: number; panY: number }
@@ -43,4 +43,36 @@ function centeredViewport(size: Size, width: number, height: number, zoom: numbe
     panX: (size.width - width * zoom) / 2,
     panY: (size.height - height * zoom) / 2,
   }
+}
+
+// Projects board-local geometry through the workspace viewport.
+export function boardViewport(vp: Viewport, origin: Pt): Viewport {
+  const { x, y } = docToScreen(vp, origin)
+  return { zoom: vp.zoom, panX: x, panY: y }
+}
+
+// Converts a centered board-local view back to workspace coordinates.
+export function workspaceViewport(vp: Viewport, origin: Pt): Viewport {
+  return boardViewport(vp, { x: -origin.x, y: -origin.y })
+}
+
+export function initialWorkspaceViewport(canvas: Size, doc: IconDoc) {
+  const first = doc.boards[0]
+  const fitFirst = () =>
+    workspaceViewport(fitViewport(canvas, first.size, first.size), first.origin)
+  if (doc.boards.length === 1) return fitFirst()
+  let left = Infinity,
+    top = Infinity,
+    right = -Infinity,
+    bottom = -Infinity
+  for (const { origin, size } of doc.boards) {
+    left = Math.min(left, origin.x)
+    top = Math.min(top, origin.y)
+    right = Math.max(right, origin.x + size)
+    bottom = Math.max(bottom, origin.y + size)
+  }
+  const width = right - left,
+    height = bottom - top
+  if (!Number.isFinite(width) || !Number.isFinite(height)) return fitFirst()
+  return workspaceViewport(fitViewport(canvas, width, height), { x: left, y: top })
 }

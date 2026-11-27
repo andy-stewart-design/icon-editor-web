@@ -2,7 +2,7 @@ import type { Command, Recipe } from '../commands'
 import { selectionBounds, type Rect } from '../geometry/bounds'
 import { flipH, flipV, rotateAbout, scaleAbout } from '../geometry/transform'
 import type { Selection } from '../history'
-import type { IconDoc, PathShape, Pt } from '../model'
+import type { BoardContent, PathShape, Pt } from '../model'
 
 // Replaces each listed shape with f(shape). Coordinates are rewritten, so no transform or angle is ever stored,
 // and stroke width is untouched. Recipes read only the doc they are given, so a drag can call them repeatedly
@@ -12,7 +12,7 @@ function mapShapes(
   f: (shapes: PathShape[]) => (s: PathShape) => PathShape,
 ): Recipe {
   const set = new Set(ids)
-  return (doc: IconDoc) => {
+  return (doc: Pick<BoardContent, 'shapes'>) => {
     const picked = doc.shapes.filter((s) => set.has(s.id))
     if (picked.length === 0) return
     const g = f(picked)

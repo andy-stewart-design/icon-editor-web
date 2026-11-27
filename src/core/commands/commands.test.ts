@@ -1,7 +1,8 @@
+import { contentOfFirstBoard, workspaceWithShapes } from '../test-fixtures/artboard-workspace'
 import { describe, expect, it } from 'vitest'
 import { makeLine, makeRect } from '../geometry/shapes'
 import { selectionBounds } from '../geometry/bounds'
-import { createDefaultDoc, type PathShape } from '../model'
+import { type PathShape } from '../model'
 import { createEditorStore } from '../store'
 import { bringForward, deleteSelection, duplicateSelection, sendBackward } from './arrange'
 import { flipSelection, resizeFactors, resizeSelection, rotationAngle } from './transform'
@@ -13,7 +14,7 @@ function rect(x: number, y: number, w: number, h: number): PathShape {
 }
 
 function setup(shapes: PathShape[]) {
-  const store = createEditorStore({ ...createDefaultDoc(), shapes })
+  const store = createEditorStore(workspaceWithShapes(shapes))
   const select = (...ids: string[]) => store.setSelection({ shapeIds: ids, nodes: [] })
   return { store, select }
 }
@@ -29,7 +30,7 @@ describe('transform commands', () => {
     const b = selectionBounds([r])!
     const { sx, sy, anchor } = resizeFactors(b, 'se', { x: b.x + b.w * 2, y: b.y + b.h * 2 })
     store.dispatch(resizeSelection(store.getState().selection, sx, sy, anchor))
-    const [out] = store.getState().doc.shapes
+    const [out] = store.getState().doc.boards[0].shapes
     expect(selectionBounds([out])).toEqual({ x: 2, y: 2, w: 8, h: 6 })
     expect(out.style).toEqual({ strokeWidth: 2 })
   })
@@ -61,7 +62,7 @@ describe('transform commands', () => {
       store.dispatch(flipSelection(store.getState().selection, axis))
     }
     const before = anchors(r)
-    const after = anchors(store.getState().doc.shapes[0])
+    const after = anchors(store.getState().doc.boards[0].shapes[0])
     after.forEach((p, i) => {
       expect(p.x).toBeCloseTo(before[i].x, 9)
       expect(p.y).toBeCloseTo(before[i].y, 9)
@@ -87,11 +88,13 @@ describe('arrange commands', () => {
     const [a, b, c] = [line(1), line(2), line(3)]
     const { store, select } = setup([a, b, c])
     select(a.id)
-    store.dispatch(duplicateSelection(store.getState().doc, store.getState().selection))
+    store.dispatch(
+      duplicateSelection(contentOfFirstBoard(store.getState().doc), store.getState().selection),
+    )
     const { doc, selection } = store.getState()
-    expect(doc.shapes).toHaveLength(4)
-    expect(doc.shapes[0].id).toBe(a.id)
-    const copy = doc.shapes[1]
+    expect(doc.boards[0].shapes).toHaveLength(4)
+    expect(doc.boards[0].shapes[0].id).toBe(a.id)
+    const copy = doc.boards[0].shapes[1]
     expect(copy.id).not.toBe(a.id)
     expect(copy.subpaths[0].nodes.map((n) => n.id)).not.toEqual(
       a.subpaths[0].nodes.map((n) => n.id),
@@ -100,9 +103,9 @@ describe('arrange commands', () => {
     expect(selection.shapeIds).toEqual([copy.id])
 
     store.dispatch(bringForward(selection))
-    expect(store.getState().doc.shapes[2].id).toBe(copy.id)
+    expect(store.getState().doc.boards[0].shapes[2].id).toBe(copy.id)
     store.dispatch(sendBackward(store.getState().selection))
-    expect(store.getState().doc.shapes[1].id).toBe(copy.id)
+    expect(store.getState().doc.boards[0].shapes[1].id).toBe(copy.id)
     // At the bottom/top nothing moves and no history entry is recorded.
     const n = store.getState().history.past.length
     store.dispatch(bringForward({ shapeIds: [c.id], nodes: [] }))
@@ -114,9 +117,9 @@ describe('arrange commands', () => {
     const { store, select } = setup([a, b])
     select(a.id)
     store.dispatch(deleteSelection(store.getState().selection))
-    expect(store.getState().doc.shapes.map((s) => s.id)).toEqual([b.id])
+    expect(store.getState().doc.boards[0].shapes.map((s) => s.id)).toEqual([b.id])
     expect(store.getState().history.past).toHaveLength(1)
     store.undo()
-    expect(store.getState().doc.shapes.map((s) => s.id)).toEqual([a.id, b.id])
+    expect(store.getState().doc.boards[0].shapes.map((s) => s.id)).toEqual([a.id, b.id])
   })
 })

@@ -1,3 +1,4 @@
+import { contentOfFirstBoard, workspaceWithShapes } from '../test-fixtures/artboard-workspace'
 import { describe, expect, it } from 'vitest'
 import { segmentsOf } from '../geometry/segments'
 import { serializeBody } from '../serialize'
@@ -67,14 +68,14 @@ describe('pen tool (AC18, AC19)', () => {
     tool.pointerUp(ev(16, 6))
     tool.pointerDown(ev(12, 12))
     tool.pointerUp(ev(12, 12))
-    expect(store.getState().doc.shapes[0].subpaths[0].nodes).toHaveLength(3)
+    expect(store.getState().doc.boards[0].shapes[0].subpaths[0].nodes).toHaveLength(3)
     expect(store.getState().history.past).toHaveLength(2)
     tool.pointerDown(ev(4.2, 4.1)) // within the close tolerance of the first node
     tool.pointerUp(ev(4.2, 4.1))
 
     const { doc, history, selection } = store.getState()
-    expect(doc.shapes).toHaveLength(1)
-    const [shape] = doc.shapes
+    expect(doc.boards[0].shapes).toHaveLength(1)
+    const [shape] = doc.boards[0].shapes
     expect(shape.style).toEqual({})
     const [sp] = shape.subpaths
     expect(sp.closed).toBe(true)
@@ -93,7 +94,7 @@ describe('pen tool (AC18, AC19)', () => {
     tool.pointerDown(ev(4, 4))
     tool.pointerUp(ev(4, 4))
     tool.keyDown('Enter')
-    expect(store.getState().doc.shapes).toHaveLength(0)
+    expect(store.getState().doc.boards[0].shapes).toHaveLength(0)
     expect(store.getState().history.past).toHaveLength(0)
   })
 
@@ -106,7 +107,7 @@ describe('pen tool (AC18, AC19)', () => {
     tool.pointerDown(ev(12, 4))
     tool.pointerUp(ev(12, 4))
     tool.keyDown('Enter')
-    const [shape] = store.getState().doc.shapes
+    const [shape] = store.getState().doc.boards[0].shapes
     expect(shape.subpaths[0].closed).toBe(false)
     expect(shape.subpaths[0].nodes).toHaveLength(2)
   })
@@ -122,9 +123,9 @@ describe('pen tool (AC18, AC19)', () => {
     tool.keyDown('Escape')
     tool.pointerUp(ev(12, 8))
     const { doc, history } = store.getState()
-    expect(doc.shapes).toHaveLength(1)
-    expect(doc.shapes[0].subpaths[0].closed).toBe(false)
-    expect(doc.shapes[0].subpaths[0].nodes).toHaveLength(2)
+    expect(doc.boards[0].shapes).toHaveLength(1)
+    expect(doc.boards[0].shapes[0].subpaths[0].closed).toBe(false)
+    expect(doc.boards[0].shapes[0].subpaths[0].nodes).toHaveLength(2)
     expect(history.past).toHaveLength(1)
   })
 
@@ -136,7 +137,7 @@ describe('pen tool (AC18, AC19)', () => {
     tool.pointerUp(ev(8, 0))
     tool.deactivate?.()
     tool.deactivate?.()
-    expect(store.getState().doc.shapes).toHaveLength(1)
+    expect(store.getState().doc.boards[0].shapes).toHaveLength(1)
     expect(store.getState().history.past).toHaveLength(1)
   })
 })
@@ -197,7 +198,7 @@ function seeded(mode: 'node' | 'shape' = 'node') {
       },
     ],
   }
-  const doc = { ...createDefaultDoc(), shapes: [a, b] }
+  const doc = workspaceWithShapes([a, b])
   const store = createEditorStore(doc)
   const select = (...shapeIds: string[]) => store.setSelection({ shapeIds, nodes: [] })
   select(a.id)
@@ -216,12 +217,12 @@ describe('Pen drawing contexts', () => {
     click(tool, 5, 9)
     tool.keyDown('Enter')
     const { doc, selection, history } = store.getState()
-    expect(doc.shapes).toHaveLength(3)
-    expect(doc.shapes[0]).toBe(a)
-    expect(doc.shapes[1]).toBe(b)
-    expect(selection.shapeIds).toEqual([doc.shapes[2].id])
+    expect(doc.boards[0].shapes).toHaveLength(3)
+    expect(doc.boards[0].shapes[0]).toBe(a)
+    expect(doc.boards[0].shapes[1]).toBe(b)
+    expect(selection.shapeIds).toEqual([doc.boards[0].shapes[2].id])
     expect(history.past).toHaveLength(1)
-    expect(serializeBody(doc)).toContain('<path d="M2 2L5 9"/>')
+    expect(serializeBody(contentOfFirstBoard(doc))).toContain('<path d="M2 2L5 9"/>')
   })
 
   it.each(['head', 'tail'] as const)(
@@ -242,7 +243,7 @@ describe('Pen drawing contexts', () => {
       tool.pointerUp(ev(8, 10))
       tool.keyDown('Enter')
       const after = store.getState().doc
-      const [edited, other] = after.shapes
+      const [edited, other] = after.boards[0].shapes
       expect(edited.id).toBe(a.id)
       expect(edited.style).toBe(a.style)
       expect(edited.subpaths[1]).toBe(a.subpaths[1])
@@ -254,7 +255,7 @@ describe('Pen drawing contexts', () => {
         index,
       })
       const expected = head ? 'M7 8C6 6 2 2 2 2C4 5 10 5 12 2' : `${curve}C12 2 6 6 7 8`
-      expect(serializeBody(after)).toContain(
+      expect(serializeBody(contentOfFirstBoard(after))).toContain(
         `<path d="${expected}${unrelated}${closed}" stroke-width="2"/>`,
       )
       expect(store.getState().history.past).toHaveLength(1)
@@ -274,7 +275,7 @@ describe('Pen drawing contexts', () => {
       const side = head ? 'hIn' : 'hOut'
       const endpoint = a.subpaths[0].nodes[head ? 0 : 1]
       expect(endpoint.mode).toBe('symmetric')
-      const contour = () => store.getState().doc.shapes[0].subpaths[0]
+      const contour = () => store.getState().doc.boards[0].shapes[0].subpaths[0]
       const node = () => contour().nodes.find((n) => n.id === endpoint.id)
 
       tool.pointerDown(ev(x, 2))
@@ -289,7 +290,8 @@ describe('Pen drawing contexts', () => {
       expect(toolContext(store.getState().ui)).toBe('node-select')
       const select = createNodeTool(store)
       click(select, x, 2)
-      const overlay = () => nodeOverlay(store.getState().doc, store.getState().selection)
+      const overlay = () =>
+        nodeOverlay(contentOfFirstBoard(store.getState().doc), store.getState().selection)
       expect(overlay()).toContainEqual({ kind: 'handle', from: endpoint.p, to: { x, y: 6 } })
 
       const originalCurve = () => {
@@ -325,11 +327,11 @@ describe('Pen drawing contexts', () => {
     tool.deactivate?.()
     tool.deactivate?.()
     const after = store.getState()
-    expect(after.doc.shapes).toHaveLength(2)
-    expect(after.doc.shapes[0].subpaths.slice(0, 3)).toEqual(a.subpaths)
-    expect(after.doc.shapes[1]).toBe(b)
+    expect(after.doc.boards[0].shapes).toHaveLength(2)
+    expect(after.doc.boards[0].shapes[0].subpaths.slice(0, 3)).toEqual(a.subpaths)
+    expect(after.doc.boards[0].shapes[1]).toBe(b)
     expect(after.selection.shapeIds).toEqual(['a'])
-    expect(serializeBody(after.doc)).toBe(
+    expect(serializeBody(contentOfFirstBoard(after.doc))).toBe(
       `<path d="${curve}${unrelated}${closed}M4 8C4 8 7 6 9 8" stroke-width="2"/><path d="M2 2L8 8"/>`,
     )
     expect(after.history.past).toHaveLength(1)
@@ -388,13 +390,13 @@ describe('Pen drawing contexts', () => {
     store.updateDoc('Overlap endpoints', (d) => {
       d.shapes[0].subpaths[1].nodes[0].p = { x: 12, y: 2 }
     })
-    const original = store.getState().doc.shapes[0].subpaths[1]
+    const original = store.getState().doc.boards[0].shapes[0].subpaths[1]
     tool.hover?.(ev(12, 2))
     expect(tool.overlay()).toContainEqual({ kind: 'penResume', p: { x: 12, y: 2 } })
     click(tool, 12, 2)
     click(tool, 22, 8)
     tool.keyDown('Enter')
-    const [shape] = store.getState().doc.shapes
+    const [shape] = store.getState().doc.boards[0].shapes
     expect(shape.subpaths).toHaveLength(3)
     expect(shape.subpaths[0].nodes).toHaveLength(3)
     expect(shape.subpaths[1]).toBe(original)
@@ -437,7 +439,7 @@ describe('Pen drawing contexts', () => {
     click(tool, 8, 8)
     click(tool, 22, 8)
     click(tool, 8, 8)
-    expect(serializeBody(store.getState().doc)).toContain('M8 8L22 8Z')
+    expect(serializeBody(contentOfFirstBoard(store.getState().doc))).toContain('M8 8L22 8Z')
   })
 
   it('inserts on open curves and closed segments, matching the raw projected hover point', () => {
@@ -453,7 +455,7 @@ describe('Pen drawing contexts', () => {
       expect(store.getState().history.past).toHaveLength(index === 0 ? 0 : 1)
       tool.pointerUp(e)
       const { doc: after, history, selection, ui } = store.getState()
-      const sp = after.shapes[0].subpaths[index]
+      const sp = after.boards[0].shapes[0].subpaths[index]
       expect(sp.nodes).toHaveLength(3)
       expect(sp.nodes[1].p).toEqual({ x: 7, y: projectedY })
       expect(sp.nodes[1].mode).toBe(index === 0 ? 'smooth' : 'corner')
@@ -509,8 +511,8 @@ describe('Pen drawing contexts', () => {
       expect(tool.overlay().some((p) => p.kind === 'nodeHover')).toBe(false)
       click(tool, 7, 4.25)
       const { doc, history } = store.getState()
-      expect(doc.shapes[0].subpaths[0]).toBe(a.subpaths[0])
-      const contour = doc.shapes[0].subpaths[kind === 'provisional' ? 3 : 1]
+      expect(doc.boards[0].shapes[0].subpaths[0]).toBe(a.subpaths[0])
+      const contour = doc.boards[0].shapes[0].subpaths[kind === 'provisional' ? 3 : 1]
       expect(contour.nodes.at(-1)?.p).toEqual({ x: 7, y: 4.25 })
       expect(history.past).toHaveLength(1)
     },
@@ -524,10 +526,10 @@ describe('Pen drawing contexts', () => {
       tool.pointerDown(ev(14 - x, 2))
       tool.pointerUp(ev(14 - x, 8)) // an existing endpoint cannot be restyled by a closing drag
       const { doc, history } = store.getState()
-      const contour = doc.shapes[0].subpaths[0]
+      const contour = doc.boards[0].shapes[0].subpaths[0]
       expect(contour.nodes).toBe(a.subpaths[0].nodes)
       expect(segmentsOf(contour)[0]).toEqual(segmentsOf(a.subpaths[0])[0])
-      expect(serializeBody(doc)).toContain(`${curve}Z${unrelated}${closed}`)
+      expect(serializeBody(contentOfFirstBoard(doc))).toContain(`${curve}Z${unrelated}${closed}`)
       expect(history.past).toHaveLength(1)
     },
   )
@@ -550,7 +552,9 @@ describe('Pen drawing contexts', () => {
       else tool.keyDown(finish)
       tool.pointerUp(ev(16, 10))
       tool.deactivate?.()
-      expect(serializeBody(store.getState().doc)).toContain(`${closed}M5 8L10 8"`)
+      expect(serializeBody(contentOfFirstBoard(store.getState().doc))).toContain(
+        `${closed}M5 8L10 8"`,
+      )
       expect(store.getState().history.past).toHaveLength(1)
     },
   )
@@ -566,7 +570,9 @@ describe('Pen drawing contexts', () => {
     store.subscribeCommitted((d) => committed.push(d))
     click(tool, 4, 9)
     expect(store.getState()).toBe(before)
-    expect(serializeBody(store.getState().doc)).toBe(serializeBody(doc))
+    expect(serializeBody(contentOfFirstBoard(store.getState().doc))).toBe(
+      serializeBody(contentOfFirstBoard(doc)),
+    )
     expect(tool.overlay()).toContainEqual({ kind: 'anchor', p: { x: 4, y: 9 } })
     tool.pointerDown(ev(9, 9))
     store.undo()
@@ -684,7 +690,7 @@ describe('Pen drawing contexts', () => {
   it.each([2, 12])('follows point Undo and Redo at endpoint x=%s', (x) => {
     const { store, tool, a } = seeded()
     const endIndex = (length: number) => (x === 2 ? 0 : length - 1)
-    const contour = () => store.getState().doc.shapes[0].subpaths[0]
+    const contour = () => store.getState().doc.boards[0].shapes[0].subpaths[0]
     const endpoint = () => contour().nodes[endIndex(contour().nodes.length)].p
     click(tool, x, 2)
     click(tool, 7, 8)
@@ -719,7 +725,7 @@ describe('Pen drawing contexts', () => {
     ])
     expect(draft?.closed).toBe(false)
     tool.pointerUp(ev(6, 5))
-    const contour = store.getState().doc.shapes[0].subpaths[0]
+    const contour = store.getState().doc.boards[0].shapes[0].subpaths[0]
     expect(contour.closed).toBe(true)
     expect(contour.nodes[0].hOut).toEqual({ x: 6, y: 5 })
     expect(contour.nodes[0].hIn).toEqual({ x: 2, y: 3 })
@@ -733,11 +739,11 @@ describe('Pen drawing contexts', () => {
     click(tool, 8, 4)
     store.undo()
     expect(tool.overlay()).toEqual([])
-    expect(store.getState().doc.shapes).toHaveLength(0)
+    expect(store.getState().doc.boards[0].shapes).toHaveLength(0)
     store.redo()
     expect(tool.overlay()).toEqual([])
     click(tool, 12, 9)
-    expect(store.getState().doc.shapes[0].subpaths[0].nodes).toHaveLength(2)
+    expect(store.getState().doc.boards[0].shapes[0].subpaths[0].nodes).toHaveLength(2)
   })
 
   it('applied closure Redo ends an attachment to the reopened contour', () => {
@@ -745,7 +751,7 @@ describe('Pen drawing contexts', () => {
     click(tool, 12, 2)
     click(tool, 7, 8)
     click(tool, 2, 2)
-    const contour = () => store.getState().doc.shapes[0].subpaths[0]
+    const contour = () => store.getState().doc.boards[0].shapes[0].subpaths[0]
     expect(store.getState().history.past).toHaveLength(2)
     expect(segmentsOf(contour())[0]).toEqual(segmentsOf(a.subpaths[0])[0])
     store.undo()
@@ -770,7 +776,7 @@ describe('saved continuation handles', () => {
       snap: () => ({ point: snapped, targets: { x: null, y: null } }),
     })
     const down = () => tool.pointerDown(ev(node.p.x, node.p.y))
-    const contour = () => store.getState().doc.shapes[0].subpaths[0]
+    const contour = () => store.getState().doc.boards[0].shapes[0].subpaths[0]
     const history = () => store.getState().history.past.length
     const preview = () => tool.overlay().find((p) => p.kind === 'draft')
     const checkPreview = () => {
@@ -789,8 +795,8 @@ describe('saved continuation handles', () => {
     expect(saved.nodes[1 - index]).toBe(original.nodes[1 - index])
     const controls = (sp: typeof original) => segmentsOf(sp).map(({ c1, c2 }) => [c1, c2])
     expect(controls(saved)).toEqual(controls(original))
-    expect(store.getState().doc.shapes[0].subpaths.slice(1)).toEqual(a.subpaths.slice(1))
-    expect(store.getState().doc.shapes[1]).toBe(b)
+    expect(store.getState().doc.boards[0].shapes[0].subpaths.slice(1)).toEqual(a.subpaths.slice(1))
+    expect(store.getState().doc.boards[0].shapes[1]).toBe(b)
     checkPreview()
     tool.keyDown('Escape')
     expect(history()).toBe(1)
@@ -829,7 +835,7 @@ describe('saved continuation handles', () => {
     const opposite = index === 0 ? 'hOut' : 'hIn'
     const preview = () => tool.overlay().find((item) => item.kind === 'contourPreview')
     const live = () => preview()?.next.nodes[index]
-    const contour = () => store.getState().doc.shapes[0].subpaths[0]
+    const contour = () => store.getState().doc.boards[0].shapes[0].subpaths[0]
     tool.pointerDown(ev(p.x, p.y))
     expect(tool.cycleHandleMode?.()).toBe(false)
     tool.pointerMove(ev(p.x, p.y + 3))
@@ -856,9 +862,9 @@ describe('saved continuation handles', () => {
     expect(preview()).toBeUndefined()
     expect(contour()).toEqual(next)
     expect(contour().nodes[1 - index]).toBe(original.nodes[1 - index])
-    expect(store.getState().doc.shapes[0].subpaths[1]).toBe(a.subpaths[1])
-    expect(store.getState().doc.shapes[0].style).toBe(a.style)
-    expect(store.getState().doc.shapes[1]).toBe(b)
+    expect(store.getState().doc.boards[0].shapes[0].subpaths[1]).toBe(a.subpaths[1])
+    expect(store.getState().doc.boards[0].shapes[0].style).toBe(a.style)
+    expect(store.getState().doc.boards[0].shapes[1]).toBe(b)
     expect(store.getState().history.past).toHaveLength(1)
     expect(
       tool.overlay().find((item) => item.kind === 'draft')?.shape.subpaths[0].nodes[0].hOut,
@@ -924,7 +930,7 @@ describe('new Pen point handle modes', () => {
     tool.pointerUp(ev(14, 4))
     const { doc, history } = store.getState()
     expect(history.past).toHaveLength(1)
-    const [first, second] = doc.shapes[0].subpaths[0].nodes
+    const [first, second] = doc.boards[0].shapes[0].subpaths[0].nodes
     expect(first.mode).toBe('corner')
     expect(first.hOut).toBeUndefined()
     expect(second).toEqual(draft)
@@ -944,7 +950,7 @@ describe('new Pen point handle modes', () => {
     expect(draft).toMatchObject({ mode: 'corner', hIn: { x: 5, y: 8 }, hOut: { x: 7, y: 12 } })
     expect(store.getState().history.past).toHaveLength(0)
     tool.pointerUp(ev(7, 12))
-    expect(store.getState().doc.shapes[0].subpaths[0].nodes[0]).toEqual({
+    expect(store.getState().doc.boards[0].shapes[0].subpaths[0].nodes[0]).toEqual({
       ...draft,
       hIn: draft?.hOut,
       hOut: draft?.hIn,

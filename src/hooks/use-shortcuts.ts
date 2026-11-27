@@ -1,5 +1,8 @@
 import { useEffect } from 'react'
 import {
+  activeBoard,
+  workspaceViewport,
+  activeContent,
   actualSizeViewport,
   bringForward,
   cutSelectedSegment,
@@ -125,7 +128,11 @@ const BINDINGS: readonly Binding[] = [
   // Edit. Undo and redo repeat while held; Cmd+D does not, so holding it doesn't stack duplicates.
   { keys: ['z'], cmd: true, run: (store) => store.undo() },
   { keys: ['z'], cmd: true, shift: 'required', run: (store) => store.redo() },
-  { keys: ['a'], cmd: true, run: (store) => store.dispatch(selectAll(store.getState().doc)) },
+  {
+    keys: ['a'],
+    cmd: true,
+    run: (store) => store.dispatch(selectAll(activeContent(store.getState()))),
+  },
   { keys: ['c'], cmd: true, run: (store) => store.clipboard('copy') },
   { keys: ['x'], cmd: true, run: (store) => store.clipboard('cut') },
   { keys: ['v'], cmd: true, run: (store) => store.clipboard('paste') },
@@ -135,7 +142,8 @@ const BINDINGS: readonly Binding[] = [
     cmd: true,
     repeat: false,
     run: (store) => {
-      const { doc, selection } = store.getState()
+      const { selection } = store.getState()
+      const doc = activeContent(store.getState())
       if (selection.shapeIds.length > 0) store.dispatch(duplicateSelection(doc, selection))
     },
   },
@@ -216,16 +224,22 @@ const BINDINGS: readonly Binding[] = [
     keys: ['0'],
     repeat: false,
     run: (store) => {
-      const { doc, ui } = store.getState()
-      store.setUi({ viewport: fitViewport(ui.canvasSize, doc.size, doc.size) })
+      const state = store.getState()
+      const { ui } = state
+      const { size, origin } = activeBoard(state)
+      store.setUi({ viewport: workspaceViewport(fitViewport(ui.canvasSize, size, size), origin) })
     },
   },
   {
     keys: ['1'],
     repeat: false,
     run: (store) => {
-      const { doc, ui } = store.getState()
-      store.setUi({ viewport: actualSizeViewport(ui.canvasSize, doc.size, doc.size) })
+      const state = store.getState()
+      const { ui } = state
+      const { size, origin } = activeBoard(state)
+      store.setUi({
+        viewport: workspaceViewport(actualSizeViewport(ui.canvasSize, size, size), origin),
+      })
     },
   },
 ]

@@ -1,5 +1,5 @@
 import { segmentBetween, type Segment } from './geometry/segments'
-import type { IconDoc, Subpath } from './model'
+import type { BoardContent, IconDoc, Subpath } from './model'
 
 // Selection is UI state, not document data, so it lives beside history rather than inside the doc.
 export type NodeRef = { shapeId: string; subpathId: string; nodeId: string }
@@ -8,7 +8,7 @@ export type SegmentRef = { shapeId: string; subpathId: string; fromId: string; t
 export type Selection = { shapeIds: string[]; nodes: NodeRef[]; segment?: SegmentRef }
 
 export function resolveSegment(
-  doc: IconDoc,
+  doc: Pick<BoardContent, 'shapes'>,
   ref: SegmentRef,
 ): { subpath: Subpath; segment: Segment } | undefined {
   const subpath = doc.shapes
@@ -30,6 +30,7 @@ export const emptySelection: Selection = { shapeIds: [], nodes: [] }
 
 // Each entry is an immutable doc snapshot pair, so undo and redo are reference swaps.
 export type HistoryEntry = {
+  boardId: string
   label: string
   before: IconDoc
   after: IconDoc
@@ -43,7 +44,7 @@ export const HISTORY_LIMIT = 200
 export const emptyHistory: HistoryState = { past: [], future: [] }
 
 // Drops selection IDs that no longer exist in the doc (shapes, subpaths or nodes).
-export function pruneSelection(sel: Selection, doc: IconDoc): Selection {
+export function pruneSelection(sel: Selection, doc: Pick<BoardContent, 'shapes'>): Selection {
   const shapes = new Map(doc.shapes.map((s) => [s.id, s]))
   const hasNode = (ref: NodeRef): boolean => {
     const subpath = shapes.get(ref.shapeId)?.subpaths.find((sp) => sp.id === ref.subpathId)

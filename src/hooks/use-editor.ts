@@ -1,5 +1,11 @@
-import { createContext, useContext, useSyncExternalStore } from 'react'
-import type { EditorState, EditorStore } from '../core'
+import { createContext, useContext, useMemo, useSyncExternalStore } from 'react'
+import {
+  activeBoard,
+  boardContent,
+  boardViewport,
+  type EditorState,
+  type EditorStore,
+} from '../core'
 
 export const EditorContext = createContext<EditorStore | null>(null)
 
@@ -17,4 +23,16 @@ export function useEditorStore(): EditorStore {
 export function useEditor<T>(selector: (s: EditorState) => T): T {
   const store = useEditorStore()
   return useSyncExternalStore(store.subscribe, () => selector(store.getState()))
+}
+
+export function useActiveContent() {
+  const doc = useEditor((state) => state.doc)
+  const board = useEditor(activeBoard)
+  return useMemo(() => boardContent(doc, board), [doc, board])
+}
+
+export function useBoardViewport() {
+  const origin = useEditor((state) => activeBoard(state).origin)
+  const vp = useEditor((state) => state.ui.viewport)
+  return boardViewport(vp, origin)
 }

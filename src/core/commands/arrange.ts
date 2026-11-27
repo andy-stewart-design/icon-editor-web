@@ -1,7 +1,7 @@
 import type { Command } from '../commands'
 import { emptySelection, type Selection } from '../history'
 import { newId } from '../ids'
-import type { IconDoc, PathShape } from '../model'
+import type { BoardContent, PathShape } from '../model'
 
 // Deep copy with fresh ids for the shape, its subpaths and its nodes.
 export function cloneWithNewIds(shape: PathShape): PathShape {
@@ -19,7 +19,7 @@ export function cloneWithNewIds(shape: PathShape): PathShape {
 
 // Each copy goes directly above its original, and the copies become the selection. Ids are made here, when the
 // command is built, so the recipe is deterministic and selectionAfter can name them.
-export function duplicateSelection(doc: IconDoc, sel: Selection): Command {
+export function duplicateSelection(doc: BoardContent, sel: Selection): Command {
   const picked = new Set(sel.shapeIds)
   const copies = new Map<string, PathShape>()
   for (const s of doc.shapes) if (picked.has(s.id)) copies.set(s.id, cloneWithNewIds(s))

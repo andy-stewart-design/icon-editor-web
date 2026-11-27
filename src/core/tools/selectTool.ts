@@ -1,3 +1,4 @@
+import { activeContent } from '../store'
 import {
   resizeFactors,
   resizeRecipe,
@@ -10,10 +11,10 @@ import type { Recipe } from '../commands'
 import type { Selection } from '../history'
 import { selectionBounds, type Rect } from '../geometry/bounds'
 import { distanceToShape, shapeIntersectsRect } from '../geometry/hit'
-import type { IconDoc, Pt } from '../model'
+import type { BoardContent, Pt } from '../model'
 import type { EditorState } from '../store'
 import { snapIndicator } from './dragTool'
-import { handleCursor, hitHandle, type HandleHit } from './handles'
+import { handleCursor, hitHandle } from './handles'
 import { buildSnapFn } from './snapFn'
 import type { OverlayPrimitive, Tool, ToolEvent } from './types'
 
@@ -26,7 +27,7 @@ export const DRAG_THRESHOLD_PX = 3
 
 // What the Select tool needs from the store. The editor store satisfies it structurally.
 export type SelectHost = {
-  getState: () => Pick<EditorState, 'doc' | 'selection' | 'ui'>
+  getState: () => Pick<EditorState, 'doc' | 'activeBoardId' | 'selection' | 'ui'>
   setSelection: (selection: Selection) => void
   begin: (label: string) => void
   update: (recipe: Recipe) => void
@@ -41,7 +42,7 @@ export type SelectTool = Tool & {
 
 // Topmost shape whose stroke covers pt. Reach is the tolerance in doc units (6 screen px ÷ zoom) plus half the
 // stroke width, so a point just outside a 1.5 stroke still hits. Null when nothing is in reach.
-export function hitTestShape(doc: IconDoc, pt: Pt, zoom: number): string | null {
+export function hitTestShape(doc: BoardContent, pt: Pt, zoom: number): string | null {
   const tolerance = HIT_TOLERANCE_PX / zoom
   for (let i = doc.shapes.length - 1; i >= 0; i--) {
     const shape = doc.shapes[i]
@@ -52,7 +53,7 @@ export function hitTestShape(doc: IconDoc, pt: Pt, zoom: number): string | null 
 }
 
 // Shapes whose geometry intersects the marquee, in z-order.
-export function shapesInRect(doc: IconDoc, rect: Rect): string[] {
+export function shapesInRect(doc: BoardContent, rect: Rect): string[] {
   return doc.shapes.filter((s) => shapeIntersectsRect(s, rect)).map((s) => s.id)
 }
 
@@ -102,6 +103,17 @@ type Marquee = {
   selectionBefore: Selection
 }
 
+export function selectionHandleAt(
+  state: ReturnType<SelectHost['getState']>,
+  e: Pick<ToolEvent, 'pt' | 'zoom' | 'shift'>,
+) {
+  const doc = activeContent(state)
+  const bounds = selectionBounds(doc.shapes.filter((s) => state.selection.shapeIds.includes(s.id)))
+  if (!bounds || (e.shift && hitTestShape(doc, e.pt, e.zoom) !== null)) return null
+  const hit = hitHandle(bounds, e.pt, e.zoom)
+  return hit ? { hit, bounds } : null
+}
+
 // Select tool. Click selects the topmost shape in reach, Shift-click toggles, and empty press clears (or marquees).
 // Press-drag on a shape moves the selection as one history transaction. Esc during a move restores the
 // pre-drag doc without a history entry.
@@ -112,13 +124,6 @@ export function createSelectTool(host: SelectHost): SelectTool {
 
   // The handle of the current selection under the pointer. A Shift-press on a shape toggles it instead, even when
   // a handle sits on the shape's own stroke.
-  const handleUnder = (e: ToolEvent): { hit: HandleHit; bounds: Rect } | null => {
-    const { doc, selection } = host.getState()
-    const bounds = selectionBounds(doc.shapes.filter((s) => selection.shapeIds.includes(s.id)))
-    if (!bounds || (e.shift && hitTestShape(doc, e.pt, e.zoom) !== null)) return null
-    const hit = hitHandle(bounds, e.pt, e.zoom)
-    return hit ? { hit, bounds } : null
-  }
 
   // Moves the selection by the offset that puts the reference point on a snapped spot. The snap ignores the
   // moving shapes, so they don't stick to their own anchors.
@@ -149,7 +154,7 @@ export function createSelectTool(host: SelectHost): SelectTool {
 
   const marqueeTo = (m: Marquee, e: ToolEvent): void => {
     m.rect = rectBetween(m.start, e.pt)
-    const hits = shapesInRect(host.getState().doc, m.rect)
+    const hits = shapesInRect(activeContent(host.getState()), m.rect)
     host.setSelection({ shapeIds: unionIds(m.base, hits), nodes: [] })
   }
 
@@ -171,11 +176,13 @@ export function createSelectTool(host: SelectHost): SelectTool {
     },
 
     pointerDown(e) {
-      const { doc, selection } = host.getState()
+      const state = host.getState()
+      const { selection } = state
+      const doc = activeContent(state)
       hovered = null
 
       // Handles of the current selection come before shape hits.
-      const under = handleUnder(e)
+      const under = selectionHandleAt(host.getState(), e)
       const selBounds = under?.bounds ?? null
       const grabbed = under?.hit ?? null
       hoverCursor = handleCursor(grabbed)
@@ -304,7 +311,7 @@ export function createSelectTool(host: SelectHost): SelectTool {
 
   function hover(e: ToolEvent): void {
     if (mode) return
-    hoverCursor = handleCursor(handleUnder(e)?.hit ?? null)
-    hovered = hitTestShape(host.getState().doc, e.pt, e.zoom)
+    hoverCursor = handleCursor(selectionHandleAt(host.getState(), e)?.hit ?? null)
+    hovered = hitTestShape(activeContent(host.getState()), e.pt, e.zoom)
   }
 }

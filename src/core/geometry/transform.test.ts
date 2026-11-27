@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { IconDoc, PathShape, Pt } from '../model'
+import type { BoardContent, PathShape, Pt } from '../model'
 import { makeEllipse, makeLine, makeRect } from './shapes'
 import { flipH, flipV, rotateAbout, scaleAbout, scaleDoc } from './transform'
 
@@ -58,9 +58,7 @@ describe('scaleDoc (artboard resize)', () => {
   it('scales coordinates by new/old size and leaves stroke widths alone', () => {
     const line = makeLine({ x: 2, y: 2 }, { x: 22, y: 22 })
     if (!line) throw new Error('expected a line')
-    const doc: IconDoc = {
-      id: 'd',
-      version: 1,
+    const doc: BoardContent = {
       size: 24,
       strokeWidth: 1.5,
       linecap: 'round',
