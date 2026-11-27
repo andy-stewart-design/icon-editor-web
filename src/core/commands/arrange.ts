@@ -12,7 +12,13 @@ export function cloneWithNewIds(shape: PathShape): PathShape {
     subpaths: shape.subpaths.map((sp) => ({
       ...sp,
       id: newId(),
-      nodes: sp.nodes.map((n) => ({ ...n, id: newId() })),
+      nodes: sp.nodes.map((n) => ({
+        ...n,
+        id: newId(),
+        p: { ...n.p },
+        ...(n.hIn && { hIn: { ...n.hIn } }),
+        ...(n.hOut && { hOut: { ...n.hOut } }),
+      })),
     })),
   }
 }

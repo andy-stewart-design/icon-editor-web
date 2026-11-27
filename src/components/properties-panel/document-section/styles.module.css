@@ -28,3 +28,9 @@
   font-size: 0.75rem;
   color: #6b6b6b;
 }
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}

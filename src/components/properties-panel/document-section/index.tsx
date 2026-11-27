@@ -1,5 +1,8 @@
 import {
   activeBoard,
+  deleteArtboard,
+  duplicateArtboard,
+  renameArtboard,
   resizeArtboard,
   setDocLinecap,
   setDocLinejoin,
@@ -40,7 +43,9 @@ export default function DocumentSection() {
   const strokeWidth = useEditor((e) => e.doc.strokeWidth)
   const linecap = useEditor((e) => e.doc.linecap)
   const linejoin = useEditor((e) => e.doc.linejoin)
-  const size = useEditor((e) => activeBoard(e).size)
+  const board = useEditor(activeBoard)
+  const canDelete = useEditor((e) => e.doc.boards.length > 1)
+  const editing = useEditor((e) => e.tx !== null)
 
   return (
     <section className={s.section} aria-labelledby="document-section-heading">
@@ -48,6 +53,38 @@ export default function DocumentSection() {
         Document
       </h2>
       <div className={s.rows}>
+        <div role="group" aria-label="Active artboard" className={s.resize}>
+          <span>{board.name}</span>
+          <div className={s.actions}>
+            <button
+              type="button"
+              disabled={editing}
+              onClick={() => {
+                const name = window.prompt('Artboard name', board.name)
+                if (name !== null) store.dispatch(renameArtboard(name))
+              }}
+            >
+              Rename
+            </button>
+            <button
+              type="button"
+              disabled={editing}
+              onClick={() => {
+                const { doc, activeBoardId } = store.getState()
+                store.dispatch(duplicateArtboard(doc, activeBoardId))
+              }}
+            >
+              Duplicate
+            </button>
+            <button
+              type="button"
+              disabled={editing || !canDelete}
+              onClick={() => store.dispatch(deleteArtboard())}
+            >
+              Delete
+            </button>
+          </div>
+        </div>
         <NumberField
           id="doc-stroke-width"
           step={0.5}
@@ -71,7 +108,7 @@ export default function DocumentSection() {
         <NumberField
           id="doc-artboard-size"
           label="Artboard"
-          value={size}
+          value={board.size}
           validate={validateArtboardSize}
           onCommit={(n) =>
             store.dispatch(resizeArtboard(n, store.getState().ui.artboardResizeMode))

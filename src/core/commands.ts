@@ -12,7 +12,12 @@ import { artboardFor, type Artboard, type IconDoc } from './model'
 import type { EditorState } from './store'
 
 export type Recipe = (board: Artboard, draft: IconDoc) => void
-export type Command = { label: string; recipe: Recipe; selectionAfter?: Selection }
+export type Command = {
+  label: string
+  recipe: Recipe
+  selectionAfter?: Selection
+  activeBoardAfter?: string
+}
 
 type StateApi = {
   getState: () => EditorState
@@ -36,7 +41,7 @@ export function createCommands(
     }
     api.setState({
       doc: entry.after,
-      activeBoardId: artboardFor(entry.after, entry.boardId).id,
+      activeBoardId: entry.boardAfterId,
       selection: entry.selectionAfter,
       history: recordEntry(history, entry),
     })
@@ -48,9 +53,15 @@ export function createCommands(
     if (tx) throw new Error(`dispatch("${command.label}") during open transaction "${tx.label}"`)
     const after = produce(doc, (draft) => command.recipe(artboardFor(draft, activeBoardId), draft))
     const selectionBefore = selection
-    const selectionAfter = selectionFor(command.selectionAfter ?? selection, after, activeBoardId)
+    const boardAfterId = artboardFor(after, command.activeBoardAfter ?? activeBoardId).id
+    const selectionAfter = selectionFor(
+      command.selectionAfter ?? (boardAfterId === activeBoardId ? selection : emptySelection),
+      after,
+      boardAfterId,
+    )
     record({
-      boardId: activeBoardId,
+      boardBeforeId: activeBoardId,
+      boardAfterId,
       label: command.label,
       before: doc,
       after,
@@ -84,7 +95,8 @@ export function createCommands(
     if (!tx) return
     api.setState({ tx: null })
     record({
-      boardId: tx.boardId,
+      boardBeforeId: tx.boardId,
+      boardAfterId: tx.boardId,
       label: tx.label,
       before: tx.base,
       after: doc,
@@ -112,8 +124,8 @@ export function createCommands(
     const { entry } = step
     api.setState({
       doc: entry.before,
-      activeBoardId: artboardFor(entry.before, entry.boardId).id,
-      selection: selectionFor(entry.selectionBefore, entry.before, entry.boardId),
+      activeBoardId: entry.boardBeforeId,
+      selection: selectionFor(entry.selectionBefore, entry.before, entry.boardBeforeId),
       history: step.history,
     })
     notify(entry.before)
@@ -127,8 +139,8 @@ export function createCommands(
     const { entry } = step
     api.setState({
       doc: entry.after,
-      activeBoardId: artboardFor(entry.after, entry.boardId).id,
-      selection: selectionFor(entry.selectionAfter, entry.after, entry.boardId),
+      activeBoardId: entry.boardAfterId,
+      selection: selectionFor(entry.selectionAfter, entry.after, entry.boardAfterId),
       history: step.history,
     })
     notify(entry.after)

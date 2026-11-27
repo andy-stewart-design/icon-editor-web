@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import {
   activeBoard,
+  addArtboard,
   workspaceViewport,
   actualSizeViewport,
   createDefaultDoc,
@@ -57,6 +58,7 @@ export default function Toolbar() {
   const zoom = useEditor((e) => e.ui.viewport.zoom)
   const mode = useEditor((e) => e.ui.mode)
   const targetCount = useEditor((e) => e.selection.shapeIds.length)
+  const editing = useEditor((e) => e.tx !== null)
   const activeTool = useEditor((e) => e.ui.activeTool)
 
   const fit = () => {
@@ -87,6 +89,17 @@ export default function Toolbar() {
       <div className={s.group}>
         <button type="button" className={s.button} onClick={newDocument}>
           New
+        </button>
+        <button
+          type="button"
+          className={s.button}
+          disabled={editing}
+          onClick={() => {
+            const { doc, activeBoardId } = store.getState()
+            store.dispatch(addArtboard(doc, activeBoardId))
+          }}
+        >
+          Add Artboard
         </button>
         <button
           type="button"

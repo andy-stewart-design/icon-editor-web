@@ -30,7 +30,8 @@ export const emptySelection: Selection = { shapeIds: [], nodes: [] }
 
 // Each entry is an immutable doc snapshot pair, so undo and redo are reference swaps.
 export type HistoryEntry = {
-  boardId: string
+  boardBeforeId: string
+  boardAfterId: string
   label: string
   before: IconDoc
   after: IconDoc

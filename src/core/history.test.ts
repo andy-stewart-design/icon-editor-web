@@ -1,3 +1,5 @@
+import { addArtboard, deleteArtboard } from './commands/artboards'
+
 import { artboardWorkspace } from './test-fixtures/artboard-workspace'
 import { describe, expect, it } from 'vitest'
 import { createEditorStore } from './store'
@@ -233,4 +235,31 @@ describe('board-scoped history', () => {
     store.replaceDocument(baseDoc())
     expect(store.getState()).toMatchObject({ activeBoardId: 'board1', selection: emptySel })
   })
+})
+
+it('restores active boards and selections on either side of board lifecycle edits', () => {
+  const store = createEditorStore(artboardWorkspace)
+  const [survivor, target] = artboardWorkspace.boards
+  store.activateBoard(target.id)
+  const selection = { shapeIds: ['large-overflow'], nodes: [] }
+  store.setSelection(selection)
+  store.dispatch(addArtboard(artboardWorkspace, target.id))
+  const added = store.getState().activeBoardId
+  expect(added).not.toBe(target.id)
+  expect(store.getState().selection).toEqual(emptySel)
+  store.undo()
+  expect(store.getState()).toMatchObject({ activeBoardId: target.id, selection })
+  store.redo()
+  expect(store.getState()).toMatchObject({ activeBoardId: added, selection: emptySel })
+  store.undo()
+
+  store.dispatch(deleteArtboard())
+  expect(store.getState()).toMatchObject({ activeBoardId: survivor.id, selection: emptySel })
+  expect(store.getState().doc.boards).toEqual([survivor])
+  store.undo()
+  expect(store.getState()).toMatchObject({ activeBoardId: target.id, selection })
+  expect(store.getState().doc.boards[1]).toBe(target) // includes its owned overflowing shape
+  store.redo()
+  expect(store.getState()).toMatchObject({ activeBoardId: survivor.id, selection: emptySel })
+  expect(store.getState().doc.boards).toEqual([survivor])
 })

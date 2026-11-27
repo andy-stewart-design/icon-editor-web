@@ -134,10 +134,10 @@ Expected files:
 
 Tasks:
 
-- [ ] Add an empty named 24 × 24 board or duplicate the target with fresh identities and independent artwork. Place either in free space near the active board, then activate it. Keep **New** as a separate confirmed reset to one board.
-- [ ] Wire Rename and Delete without a dedicated tool. Keep at least one board; otherwise remove only the target and its owned artwork, choose a valid active board, and make all lifecycle edits reversible.
-- [ ] Test independent copies, free placement, active fallback, last-board protection, and deletion/restoration of owned overflow.
-- [ ] Satisfy verification and the completion gate, and record concise evidence.
+- [x] Add an empty named 24 × 24 board or duplicate the target with fresh identities and independent artwork. Place either in free space near the active board, then activate it. Keep **New** as a separate confirmed reset to one board.
+- [x] Wire Rename and Delete without a dedicated tool. Keep at least one board; otherwise remove only the target and its owned artwork, choose a valid active board, and make all lifecycle edits reversible.
+- [x] Test independent copies, free placement, active fallback, last-board protection, and deletion/restoration of owned overflow.
+- [x] Satisfy verification and the completion gate, and record concise evidence.
 
 Verification:
 
