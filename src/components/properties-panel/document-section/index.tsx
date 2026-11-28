@@ -15,7 +15,6 @@ import {
 } from "../../../core";
 import { useEditor, useEditorStore } from "../../../hooks/use-editor";
 import NumberField from "../../number-field";
-import SegmentedControl from "../../segmented-control";
 import s from "./styles.module.css";
 
 const CAPS = [
