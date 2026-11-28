@@ -1,4 +1,4 @@
-import { useMemo, type ReactNode } from "react";
+import { useMemo } from "react";
 import {
   resetLinecap,
   resetLinejoin,
@@ -13,7 +13,6 @@ import {
   validateBoundsCoord,
   validateBoundsSize,
   validateStrokeWidth,
-  type FieldState,
   type Linecap,
   type Linejoin,
   type Rect,
@@ -25,7 +24,6 @@ import {
   useActiveContent,
 } from "../../../hooks/use-editor";
 import NumberField from "../../number-field";
-import SegmentedControl from "../../segmented-control";
 import s from "./styles.module.css";
 import Select from "../../core/select";
 
@@ -120,14 +118,18 @@ export default function ShapeSection() {
           />
         </div>
 
-        <StrokeRow
-          state={stroke}
-          overridden={hasOverride("strokeWidth")}
+        <NumberField
+          id="doc-stroke-width"
+          step={0.5}
+          label="Stroke width"
+          value={stroke.kind === "same" && stroke.value}
+          validate={validateStrokeWidth}
           onCommit={(n) =>
             store.dispatch(
               setStrokeWidthOverride(store.getState().selection, n),
             )
           }
+          overridden={hasOverride("strokeWidth")}
           onReset={() =>
             store.dispatch(resetStrokeWidth(store.getState().selection))
           }
@@ -140,31 +142,11 @@ export default function ShapeSection() {
           onValueChange={(join: (typeof CAPS)[number]["value"]) =>
             store.dispatch(setLinecapOverride(store.getState().selection, join))
           }
-          overridden={linecap.kind === "same" && linecap.overridden}
+          overridden={hasOverride("linecap")}
           onReset={() =>
             store.dispatch(resetLinecap(store.getState().selection))
           }
         />
-
-        {/*<StyleRow
-          label="Linejoin"
-          state={join}
-          overridden={hasOverride("linejoin")}
-          onReset={() =>
-            store.dispatch(resetLinejoin(store.getState().selection))
-          }
-        >
-          <SegmentedControl<Linejoin>
-            label="Shape linejoin"
-            options={JOINS}
-            value={join.kind === "same" ? join.value : undefined}
-            mixed={join.kind === "mixed"}
-            disabled={join.kind === "none"}
-            onChange={(v) =>
-              store.dispatch(setLinejoinOverride(store.getState().selection, v))
-            }
-          />
-        </StyleRow>*/}
 
         <Select
           label="Corner"
@@ -173,97 +155,12 @@ export default function ShapeSection() {
           onValueChange={(v: (typeof JOINS)[number]["value"]) =>
             store.dispatch(setLinejoinOverride(store.getState().selection, v))
           }
-          overridden={join.kind === "same" && join.overridden}
+          overridden={hasOverride("linejoin")}
           onReset={() =>
             store.dispatch(resetLinejoin(store.getState().selection))
           }
         />
       </div>
     </section>
-  );
-}
-
-interface StyleRowProps<V> {
-  label: string;
-  state: FieldState<V>;
-  overridden: boolean;
-  onReset: () => void;
-  children: ReactNode;
-}
-
-// Label, control and a status line with Reset. The status shows Inherited or Override, or Mixed.
-function StyleRow<V>({
-  label,
-  state,
-  overridden,
-  onReset,
-  children,
-}: StyleRowProps<V>) {
-  return (
-    <div className={s.styleRow}>
-      <div className={s.styleHead}>
-        <span>{label}</span>
-        <span className={s.status}>{statusText(state, overridden)}</span>
-        <button
-          type="button"
-          className={s.reset}
-          disabled={!overridden}
-          onClick={onReset}
-        >
-          Reset
-        </button>
-      </div>
-      {children}
-    </div>
-  );
-}
-
-function statusText<V>(state: FieldState<V>, overridden: boolean): string {
-  if (state.kind === "none") return "";
-  if (state.kind === "mixed") return "Mixed";
-  return overridden ? "Override" : "Inherited";
-}
-
-function StrokeRow({
-  state,
-  overridden,
-  onCommit,
-  onReset,
-}: {
-  state: FieldState<number>;
-  overridden: boolean;
-  onCommit: (n: number) => void;
-  onReset: () => void;
-}) {
-  return (
-    <div className={s.styleRow}>
-      <div className={s.styleHead}>
-        <span className={s.grow}>Stroke width</span>
-        <span className={s.status}>{statusText(state, overridden)}</span>
-        <button
-          type="button"
-          className={s.reset}
-          disabled={!overridden}
-          onClick={onReset}
-        >
-          Reset
-        </button>
-      </div>
-      <NumberField
-        id="shape-stroke-width"
-        step={0.5}
-        label="Value"
-        value={
-          state.kind === "same"
-            ? state.value
-            : state.kind === "mixed"
-              ? "mixed"
-              : undefined
-        }
-        validate={validateStrokeWidth}
-        disabled={state.kind === "none"}
-        onCommit={onCommit}
-      />
-    </div>
   );
 }

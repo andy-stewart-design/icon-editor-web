@@ -85,6 +85,34 @@ export default function DocumentSection() {
             </button>
           </div>
         </div>
+
+        <NumberField
+          key={board.id}
+          id="doc-artboard-size"
+          disabled={editing}
+          label="Size"
+          value={board.size}
+          validate={validateArtboardSize}
+          onCommit={(n) =>
+            store.dispatch(
+              resizeArtboard(n, store.getState().ui.artboardResizeMode),
+            )
+          }
+        />
+
+        <label className={s.checkbox}>
+          <span>Scale on resize</span>
+          <input
+            type="checkbox"
+            checked={resizeMode === "scale"}
+            onChange={(e) =>
+              store.setUi({
+                artboardResizeMode: e.target.checked ? "scale" : "keep",
+              })
+            }
+          />
+        </label>
+
         <NumberField
           id="doc-stroke-width"
           step={0.5}
@@ -111,33 +139,6 @@ export default function DocumentSection() {
             store.dispatch(setDocLinejoin(join))
           }
         />
-
-        <NumberField
-          key={board.id}
-          id="doc-artboard-size"
-          disabled={editing}
-          label="Artboard"
-          value={board.size}
-          validate={validateArtboardSize}
-          onCommit={(n) =>
-            store.dispatch(
-              resizeArtboard(n, store.getState().ui.artboardResizeMode),
-            )
-          }
-        />
-
-        <label className={s.checkbox}>
-          <span>Scale on resize</span>
-          <input
-            type="checkbox"
-            checked={resizeMode === "scale"}
-            onChange={(e) =>
-              store.setUi({
-                artboardResizeMode: e.target.checked ? "scale" : "keep",
-              })
-            }
-          />
-        </label>
       </div>
     </section>
   );
