@@ -14,6 +14,9 @@ import {
   type Linejoin,
 } from "../../../core";
 import { useEditor, useEditorStore } from "../../../hooks/use-editor";
+import IconDuplicate from "../../core/icons/duplicate";
+import IconEdit from "../../core/icons/edit";
+import IconTrash from "../../core/icons/trash";
 import NumberField from "../../number-field";
 import s from "./styles.module.css";
 
@@ -47,7 +50,7 @@ export default function DocumentSection() {
         Document
       </h2>
       <div className={s.rows}>
-        <div role="group" aria-label="Active artboard" className={s.resize}>
+        <div role="group" aria-label="Active artboard" className={s.artboard}>
           <span>{board.name}</span>
           <div className={s.actions}>
             <button
@@ -57,8 +60,9 @@ export default function DocumentSection() {
                 const name = window.prompt("Artboard name", board.name);
                 if (name !== null) store.dispatch(renameArtboard(name));
               }}
+              aria-label="Rename"
             >
-              Rename
+              <IconEdit size={16} />
             </button>
             <button
               type="button"
@@ -67,15 +71,17 @@ export default function DocumentSection() {
                 const { doc, activeBoardId } = store.getState();
                 store.dispatch(duplicateArtboard(doc, activeBoardId));
               }}
+              aria-label="Duplicate"
             >
-              Duplicate
+              <IconDuplicate size={16} />
             </button>
             <button
               type="button"
               disabled={editing || !canDelete}
               onClick={() => store.dispatch(deleteArtboard())}
+              aria-label="Delete"
             >
-              Delete
+              <IconTrash size={16} />
             </button>
           </div>
         </div>
@@ -91,7 +97,7 @@ export default function DocumentSection() {
         <Select
           label="Stoke cap"
           items={CAPS}
-          defaultValue={linecap}
+          value={linecap}
           onValueChange={(join: (typeof CAPS)[number]["value"]) =>
             store.dispatch(setDocLinecap(join))
           }
@@ -100,7 +106,7 @@ export default function DocumentSection() {
         <Select
           label="Corner"
           items={JOINS}
-          defaultValue={linejoin}
+          value={linejoin}
           onValueChange={(join: (typeof JOINS)[number]["value"]) =>
             store.dispatch(setDocLinejoin(join))
           }

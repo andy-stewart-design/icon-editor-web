@@ -19,10 +19,27 @@
     gap: 0.5rem;
 }
 
+.artboard {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    block-size: 1.75rem;
+    font-size: 0.8125rem;
+}
+
 .actions {
     display: flex;
     flex-wrap: wrap;
     gap: 0.25rem;
+
+    button {
+        display: flex;
+        align-items: center;
+        background: none;
+        border: none;
+        justify-content: center;
+        padding: 0.125rem;
+    }
 }
 
 .checkbox {

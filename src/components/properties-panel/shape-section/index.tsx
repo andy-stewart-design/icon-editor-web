@@ -1,4 +1,4 @@
-import { useMemo, type ReactNode } from 'react'
+import { useMemo, type ReactNode } from "react";
 import {
   resetLinecap,
   resetLinejoin,
@@ -18,43 +18,66 @@ import {
   type Linejoin,
   type Rect,
   type StyleField,
-} from '../../../core'
-import { useEditor, useEditorStore, useActiveContent } from '../../../hooks/use-editor'
-import NumberField from '../../number-field'
-import SegmentedControl from '../../segmented-control'
-import s from './styles.module.css'
+} from "../../../core";
+import {
+  useEditor,
+  useEditorStore,
+  useActiveContent,
+} from "../../../hooks/use-editor";
+import NumberField from "../../number-field";
+import SegmentedControl from "../../segmented-control";
+import s from "./styles.module.css";
+import Select from "../../core/select";
 
 const CAPS = [
-  { value: 'butt', label: 'Butt' },
-  { value: 'round', label: 'Round' },
-  { value: 'square', label: 'Square' },
-] as const satisfies readonly { value: Linecap; label: string }[]
+  { value: "round", label: "Round" },
+  { value: "butt", label: "Butt" },
+  { value: "square", label: "Square" },
+] as const satisfies readonly { value: Linecap; label: string }[];
 
 const JOINS = [
-  { value: 'miter', label: 'Miter' },
-  { value: 'round', label: 'Round' },
-  { value: 'bevel', label: 'Bevel' },
-] as const satisfies readonly { value: Linejoin; label: string }[]
+  { value: "miter", label: "Miter" },
+  { value: "round", label: "Round" },
+  { value: "bevel", label: "Bevel" },
+] as const satisfies readonly { value: Linejoin; label: string }[];
 
 // Shown only when something is selected. Bounds edits go through setSelectionBounds. Style fields are per-shape
 // overrides applied to every selected shape; "Inherited" means the value comes from the document default.
 export default function ShapeSection() {
-  const store = useEditorStore()
-  const doc = useActiveContent()
-  const selection = useEditor((e) => e.selection)
+  const store = useEditorStore();
+  const doc = useActiveContent();
+  const selection = useEditor((e) => e.selection);
 
-  const rect = useMemo(() => selectionRect(doc, selection), [doc, selection])
-  const stroke = useMemo(() => selectionField(doc, selection, 'strokeWidth'), [doc, selection])
-  const cap = useMemo(() => selectionField(doc, selection, 'linecap'), [doc, selection])
-  const join = useMemo(() => selectionField(doc, selection, 'linejoin'), [doc, selection])
-  const hasOverride = (field: StyleField) => selectionHasOverride(doc, selection, field)
+  const rect = useMemo(() => selectionRect(doc, selection), [doc, selection]);
+  const stroke = useMemo(
+    () => selectionField(doc, selection, "strokeWidth"),
+    [doc, selection],
+  );
+  const linecap = useMemo(
+    () => selectionField(doc, selection, "linecap"),
+    [doc, selection],
+  );
+  const join = useMemo(
+    () => selectionField(doc, selection, "linejoin"),
+    [doc, selection],
+  );
+  const hasOverride = (field: StyleField) =>
+    selectionHasOverride(doc, selection, field);
 
   // Keeps the other three values; the command's sizes are ignored for axes of zero extent.
   const setBounds = (patch: Partial<Rect>) => {
-    if (!rect) return
-    const next = { ...rect, ...patch }
-    store.dispatch(setSelectionBounds(store.getState().selection, next.x, next.y, next.w, next.h))
-  }
+    if (!rect) return;
+    const next = { ...rect, ...patch };
+    store.dispatch(
+      setSelectionBounds(
+        store.getState().selection,
+        next.x,
+        next.y,
+        next.w,
+        next.h,
+      ),
+    );
+  };
 
   return (
     <section className={s.section} aria-labelledby="shape-section-heading">
@@ -99,75 +122,106 @@ export default function ShapeSection() {
 
         <StrokeRow
           state={stroke}
-          overridden={hasOverride('strokeWidth')}
-          onCommit={(n) => store.dispatch(setStrokeWidthOverride(store.getState().selection, n))}
-          onReset={() => store.dispatch(resetStrokeWidth(store.getState().selection))}
+          overridden={hasOverride("strokeWidth")}
+          onCommit={(n) =>
+            store.dispatch(
+              setStrokeWidthOverride(store.getState().selection, n),
+            )
+          }
+          onReset={() =>
+            store.dispatch(resetStrokeWidth(store.getState().selection))
+          }
         />
 
-        <StyleRow
-          label="Linecap"
-          state={cap}
-          overridden={hasOverride('linecap')}
-          onReset={() => store.dispatch(resetLinecap(store.getState().selection))}
-        >
-          <SegmentedControl<Linecap>
-            label="Shape linecap"
-            options={CAPS}
-            value={cap.kind === 'same' ? cap.value : undefined}
-            mixed={cap.kind === 'mixed'}
-            disabled={cap.kind === 'none'}
-            onChange={(v) => store.dispatch(setLinecapOverride(store.getState().selection, v))}
-          />
-        </StyleRow>
+        <Select
+          label="Stoke cap"
+          items={CAPS}
+          value={linecap.kind === "same" && linecap.value}
+          onValueChange={(join: (typeof CAPS)[number]["value"]) =>
+            store.dispatch(setLinecapOverride(store.getState().selection, join))
+          }
+          overridden={linecap.kind === "same" && linecap.overridden}
+          onReset={() =>
+            store.dispatch(resetLinecap(store.getState().selection))
+          }
+        />
 
-        <StyleRow
+        {/*<StyleRow
           label="Linejoin"
           state={join}
-          overridden={hasOverride('linejoin')}
-          onReset={() => store.dispatch(resetLinejoin(store.getState().selection))}
+          overridden={hasOverride("linejoin")}
+          onReset={() =>
+            store.dispatch(resetLinejoin(store.getState().selection))
+          }
         >
           <SegmentedControl<Linejoin>
             label="Shape linejoin"
             options={JOINS}
-            value={join.kind === 'same' ? join.value : undefined}
-            mixed={join.kind === 'mixed'}
-            disabled={join.kind === 'none'}
-            onChange={(v) => store.dispatch(setLinejoinOverride(store.getState().selection, v))}
+            value={join.kind === "same" ? join.value : undefined}
+            mixed={join.kind === "mixed"}
+            disabled={join.kind === "none"}
+            onChange={(v) =>
+              store.dispatch(setLinejoinOverride(store.getState().selection, v))
+            }
           />
-        </StyleRow>
+        </StyleRow>*/}
+
+        <Select
+          label="Corner"
+          items={JOINS}
+          value={join.kind === "same" && join.value}
+          onValueChange={(v: (typeof JOINS)[number]["value"]) =>
+            store.dispatch(setLinejoinOverride(store.getState().selection, v))
+          }
+          overridden={join.kind === "same" && join.overridden}
+          onReset={() =>
+            store.dispatch(resetLinejoin(store.getState().selection))
+          }
+        />
       </div>
     </section>
-  )
+  );
 }
 
 interface StyleRowProps<V> {
-  label: string
-  state: FieldState<V>
-  overridden: boolean
-  onReset: () => void
-  children: ReactNode
+  label: string;
+  state: FieldState<V>;
+  overridden: boolean;
+  onReset: () => void;
+  children: ReactNode;
 }
 
 // Label, control and a status line with Reset. The status shows Inherited or Override, or Mixed.
-function StyleRow<V>({ label, state, overridden, onReset, children }: StyleRowProps<V>) {
+function StyleRow<V>({
+  label,
+  state,
+  overridden,
+  onReset,
+  children,
+}: StyleRowProps<V>) {
   return (
     <div className={s.styleRow}>
       <div className={s.styleHead}>
         <span>{label}</span>
         <span className={s.status}>{statusText(state, overridden)}</span>
-        <button type="button" className={s.reset} disabled={!overridden} onClick={onReset}>
+        <button
+          type="button"
+          className={s.reset}
+          disabled={!overridden}
+          onClick={onReset}
+        >
           Reset
         </button>
       </div>
       {children}
     </div>
-  )
+  );
 }
 
 function statusText<V>(state: FieldState<V>, overridden: boolean): string {
-  if (state.kind === 'none') return ''
-  if (state.kind === 'mixed') return 'Mixed'
-  return overridden ? 'Override' : 'Inherited'
+  if (state.kind === "none") return "";
+  if (state.kind === "mixed") return "Mixed";
+  return overridden ? "Override" : "Inherited";
 }
 
 function StrokeRow({
@@ -176,17 +230,22 @@ function StrokeRow({
   onCommit,
   onReset,
 }: {
-  state: FieldState<number>
-  overridden: boolean
-  onCommit: (n: number) => void
-  onReset: () => void
+  state: FieldState<number>;
+  overridden: boolean;
+  onCommit: (n: number) => void;
+  onReset: () => void;
 }) {
   return (
     <div className={s.styleRow}>
       <div className={s.styleHead}>
         <span className={s.grow}>Stroke width</span>
         <span className={s.status}>{statusText(state, overridden)}</span>
-        <button type="button" className={s.reset} disabled={!overridden} onClick={onReset}>
+        <button
+          type="button"
+          className={s.reset}
+          disabled={!overridden}
+          onClick={onReset}
+        >
           Reset
         </button>
       </div>
@@ -194,11 +253,17 @@ function StrokeRow({
         id="shape-stroke-width"
         step={0.5}
         label="Value"
-        value={state.kind === 'same' ? state.value : state.kind === 'mixed' ? 'mixed' : undefined}
+        value={
+          state.kind === "same"
+            ? state.value
+            : state.kind === "mixed"
+              ? "mixed"
+              : undefined
+        }
         validate={validateStrokeWidth}
-        disabled={state.kind === 'none'}
+        disabled={state.kind === "none"}
         onCommit={onCommit}
       />
     </div>
-  )
+  );
 }
