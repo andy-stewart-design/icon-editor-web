@@ -2,68 +2,74 @@
 *,
 *::before,
 *::after {
-  box-sizing: border-box;
+    box-sizing: border-box;
 }
 
 /* 2. Remove default margin */
 *:not(dialog) {
-  margin: 0;
+    margin: 0;
 }
 
 :where(html, body, #root) {
-  height: 100%;
+    height: 100%;
 }
 
 :where(html) {
-  background: white;
-  color: black;
-  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    background: white;
+    color: black;
+    font-family:
+        system-ui,
+        -apple-system,
+        "Segoe UI",
+        Roboto,
+        sans-serif;
 
-  /*@media (prefers-color-scheme: dark) {
+    /*@media (prefers-color-scheme: dark) {
         background: black;
         color: white;
     }*/
 
-  /* 3. Enable keyword animations */
-  @media (prefers-reduced-motion: no-preference) {
-    interpolate-size: allow-keywords;
-  }
+    /* 3. Enable keyword animations */
+    @media (prefers-reduced-motion: no-preference) {
+        interpolate-size: allow-keywords;
+    }
 }
 
 :where(body) {
-  /* 4. Increase line-height */
-  line-height: 1.5;
-  /* 5. Improve text rendering */
-  -webkit-font-smoothing: antialiased;
+    position: relative;
+    /* 4. Increase line-height */
+    line-height: 1.5;
+    /* 5. Improve text rendering */
+    -webkit-font-smoothing: antialiased;
 }
 
 /* 6. Improve media defaults */
 :where(img, picture, video, canvas) {
-  display: block;
-  max-width: 100%;
+    display: block;
+    max-width: 100%;
 }
 
 /* 7. Inherit fonts for form controls */
 :where(input, button, textarea, select) {
-  font: inherit;
+    font: inherit;
 }
 
 /* 8. Avoid text overflows */
 :where(p, h1, h2, h3, h4, h5, h6) {
-  overflow-wrap: break-word;
+    overflow-wrap: break-word;
 }
 
 /* 9. Improve line wrapping */
 :where(p) {
-  text-wrap: pretty;
+    text-wrap: pretty;
 }
 :where(h1, h2, h3, h4, h5, h6) {
-  text-wrap: balance;
+    text-wrap: balance;
 }
 
 /*
   10. Create a root stacking context
 */
 #root {
-  isolation: isolate;
+    isolation: isolate;
 }

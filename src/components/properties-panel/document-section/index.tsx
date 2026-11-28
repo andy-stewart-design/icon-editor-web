@@ -1,3 +1,4 @@
+import Select from "../../../components/core/select";
 import {
   activeBoard,
   deleteArtboard,
@@ -8,44 +9,38 @@ import {
   setDocLinejoin,
   setDocStrokeWidth,
   validateArtboardSize,
-  type ResizeMode,
   validateStrokeWidth,
   type Linecap,
   type Linejoin,
-} from '../../../core'
-import { useEditor, useEditorStore } from '../../../hooks/use-editor'
-import NumberField from '../../number-field'
-import SegmentedControl from '../../segmented-control'
-import s from './styles.module.css'
+} from "../../../core";
+import { useEditor, useEditorStore } from "../../../hooks/use-editor";
+import NumberField from "../../number-field";
+import SegmentedControl from "../../segmented-control";
+import s from "./styles.module.css";
 
 const CAPS = [
-  { value: 'butt', label: 'Butt' },
-  { value: 'round', label: 'Round' },
-  { value: 'square', label: 'Square' },
-] as const satisfies readonly { value: Linecap; label: string }[]
+  { value: "round", label: "Round" },
+  { value: "butt", label: "Butt" },
+  { value: "square", label: "Square" },
+] as const satisfies readonly { value: Linecap; label: string }[];
 
 const JOINS = [
-  { value: 'miter', label: 'Miter' },
-  { value: 'round', label: 'Round' },
-  { value: 'bevel', label: 'Bevel' },
-] as const satisfies readonly { value: Linejoin; label: string }[]
-
-const RESIZE_MODES = [
-  { value: 'keep', label: 'Stay in place' },
-  { value: 'scale', label: 'Scale shapes' },
-] as const satisfies readonly { value: ResizeMode; label: string }[]
+  { value: "round", label: "Round" },
+  { value: "miter", label: "Miter" },
+  { value: "bevel", label: "Bevel" },
+] as const satisfies readonly { value: Linejoin; label: string }[];
 
 // Document defaults: stroke width, linecap, linejoin, and artboard size. The artboard size commits immediately;
 // the "On resize" choice (UI state, not history) decides whether shapes stay in place or scale with it.
 export default function DocumentSection() {
-  const store = useEditorStore()
-  const resizeMode = useEditor((e) => e.ui.artboardResizeMode)
-  const strokeWidth = useEditor((e) => e.doc.strokeWidth)
-  const linecap = useEditor((e) => e.doc.linecap)
-  const linejoin = useEditor((e) => e.doc.linejoin)
-  const board = useEditor(activeBoard)
-  const canDelete = useEditor((e) => e.doc.boards.length > 1)
-  const editing = useEditor((e) => e.tx !== null)
+  const store = useEditorStore();
+  const resizeMode = useEditor((e) => e.ui.artboardResizeMode);
+  const strokeWidth = useEditor((e) => e.doc.strokeWidth);
+  const linecap = useEditor((e) => e.doc.linecap);
+  const linejoin = useEditor((e) => e.doc.linejoin);
+  const board = useEditor(activeBoard);
+  const canDelete = useEditor((e) => e.doc.boards.length > 1);
+  const editing = useEditor((e) => e.tx !== null);
 
   return (
     <section className={s.section} aria-labelledby="document-section-heading">
@@ -60,8 +55,8 @@ export default function DocumentSection() {
               type="button"
               disabled={editing}
               onClick={() => {
-                const name = window.prompt('Artboard name', board.name)
-                if (name !== null) store.dispatch(renameArtboard(name))
+                const name = window.prompt("Artboard name", board.name);
+                if (name !== null) store.dispatch(renameArtboard(name));
               }}
             >
               Rename
@@ -70,8 +65,8 @@ export default function DocumentSection() {
               type="button"
               disabled={editing}
               onClick={() => {
-                const { doc, activeBoardId } = store.getState()
-                store.dispatch(duplicateArtboard(doc, activeBoardId))
+                const { doc, activeBoardId } = store.getState();
+                store.dispatch(duplicateArtboard(doc, activeBoardId));
               }}
             >
               Duplicate
@@ -93,18 +88,25 @@ export default function DocumentSection() {
           validate={validateStrokeWidth}
           onCommit={(n) => store.dispatch(setDocStrokeWidth(n))}
         />
-        <SegmentedControl
-          label="Linecap"
-          options={CAPS}
-          value={linecap}
-          onChange={(cap) => store.dispatch(setDocLinecap(cap))}
+
+        <Select
+          label="Stoke cap"
+          items={CAPS}
+          defaultValue={linecap}
+          onValueChange={(join: (typeof CAPS)[number]["value"]) =>
+            store.dispatch(setDocLinecap(join))
+          }
         />
-        <SegmentedControl
-          label="Linejoin"
-          options={JOINS}
-          value={linejoin}
-          onChange={(join) => store.dispatch(setDocLinejoin(join))}
+
+        <Select
+          label="Corner"
+          items={JOINS}
+          defaultValue={linejoin}
+          onValueChange={(join: (typeof JOINS)[number]["value"]) =>
+            store.dispatch(setDocLinejoin(join))
+          }
         />
+
         <NumberField
           key={board.id}
           id="doc-artboard-size"
@@ -113,19 +115,25 @@ export default function DocumentSection() {
           value={board.size}
           validate={validateArtboardSize}
           onCommit={(n) =>
-            store.dispatch(resizeArtboard(n, store.getState().ui.artboardResizeMode))
+            store.dispatch(
+              resizeArtboard(n, store.getState().ui.artboardResizeMode),
+            )
           }
         />
-        <div className={s.resize}>
-          <span className={s.hint}>On resize (applies to artboard size)</span>
-          <SegmentedControl
-            label="On resize (applies to artboard size)"
-            options={RESIZE_MODES}
-            value={resizeMode}
-            onChange={(mode) => store.setUi({ artboardResizeMode: mode })}
+
+        <label className={s.checkbox}>
+          <span>Scale on resize</span>
+          <input
+            type="checkbox"
+            checked={resizeMode === "scale"}
+            onChange={(e) =>
+              store.setUi({
+                artboardResizeMode: e.target.checked ? "scale" : "keep",
+              })
+            }
           />
-        </div>
+        </label>
       </div>
     </section>
-  )
+  );
 }

@@ -1,36 +1,36 @@
 .section {
-  padding: 0.75rem;
-  border-bottom: 1px solid #d4d4d4;
+    padding: 0.75rem;
+    border-bottom: 1px solid #d4d4d4;
 }
 
 .heading {
-  margin-bottom: 0.5rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: #6b6b6b;
+    margin-bottom: 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    /*text-transform: uppercase;
+  letter-spacing: 0.04em;*/
+    letter-spacing: 0;
+    color: #6b6b6b;
 }
 
 .rows {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.resize {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.hint {
-  font-size: 0.75rem;
-  color: #6b6b6b;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
 }
 
 .actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+}
+
+.checkbox {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    block-size: 1.75rem;
+    font-size: 0.8125rem;
+    user-select: none;
+    accent-color: #000;
 }
