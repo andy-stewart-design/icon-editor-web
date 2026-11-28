@@ -9,6 +9,7 @@
     font-weight: 500;
     letter-spacing: 0;
     color: #6b6b6b;
+    user-select: none;
 }
 
 .rows {
