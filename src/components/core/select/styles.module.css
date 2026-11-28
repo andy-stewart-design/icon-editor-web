@@ -32,7 +32,7 @@
 }
 
 .popover {
-    background: white;
+    background: #fff;
     border: 1px solid #c4c4c4;
     inline-size: calc(var(--anchor-width) + 0.25rem);
     padding: 0.125rem;
