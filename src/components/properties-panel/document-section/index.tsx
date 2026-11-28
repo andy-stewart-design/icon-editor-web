@@ -17,7 +17,7 @@ import { useEditor, useEditorStore } from "../../../hooks/use-editor";
 import IconDuplicate from "../../core/icons/duplicate";
 import IconEdit from "../../core/icons/edit";
 import IconTrash from "../../core/icons/trash";
-import NumberField from "../../number-field";
+import NumberField from "../../core/number-field";
 import s from "./styles.module.css";
 
 const CAPS = [

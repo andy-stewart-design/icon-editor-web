@@ -23,7 +23,7 @@ import {
   useEditorStore,
   useActiveContent,
 } from "../../../hooks/use-editor";
-import NumberField from "../../number-field";
+import NumberField from "../../core/number-field";
 import s from "./styles.module.css";
 import Select from "../../core/select";
 

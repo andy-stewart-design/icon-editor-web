@@ -12,8 +12,7 @@ import {
   useEditorStore,
   useActiveContent,
 } from "../../../hooks/use-editor";
-import NumberField from "../../number-field";
-import SegmentedControl from "../../segmented-control";
+import NumberField from "../../core/number-field";
 import s from "./styles.module.css";
 import Select from "../../core/select";
 

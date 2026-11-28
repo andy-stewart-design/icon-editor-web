@@ -1,7 +1,7 @@
 import { useRef, useState, type KeyboardEvent } from "react";
-import type { FieldParse } from "../../core";
+import type { FieldParse } from "../../../core";
 import s from "./styles.module.css";
-import IconUndo from "../core/icons/undo";
+import IconUndo from "../icons/undo";
 
 interface Props {
   id: string;
